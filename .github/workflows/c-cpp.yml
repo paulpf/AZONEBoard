@@ -1,24 +1,33 @@
-name: PlatformIO CI
+name: Build ESP12E-USB
 
-on: [push]
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cache/pip
-            ~/.platformio/.cache
-          key: ${{ runner.os }}-pio
-      - uses: actions/setup-python@v4
-        with:
-          python-version: '3.11'
-      - name: Install PlatformIO Core
-        run: pip install --upgrade platformio
+    - name: Checkout repository
+      uses: actions/checkout@v2
 
-      - name: Build PlatformIO Project
-        run: pio run
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.8'
+
+    - name: Install PlatformIO
+      run: |
+        python -m pip install --upgrade pip
+        pip install platformio
+
+    - name: Build environment esp12e-usb
+      run: platformio run -e esp12e-usb
+
+    - name: Build environment esp12e-usb
+      run: platformio run -e esp12e-ota
