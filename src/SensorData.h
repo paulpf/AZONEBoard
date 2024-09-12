@@ -1,9 +1,12 @@
+// SensorData.h
+
 #ifndef SENSOR_DATA_H
 #define SENSOR_DATA_H
 
 #include <inttypes.h>
 
-struct SensorData {
+struct SensorData
+{
     float temperature;
     float humidity;
     uint16_t tvoc;

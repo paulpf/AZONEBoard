@@ -1,15 +1,17 @@
+// main.cpp
+
 #include <Arduino.h>
 #include "SensorManager.h"
-#include "CommunicationManager.h"
+#include "PublishManager.h"
 #include "OtaManager.h"
 
 // Create instances of SensorManager and PublishManager
 SensorManager sensorManager;
-CommunicationManager communicationManager;
+PublishManager pubManager;
 OtaManager otaManager;
 
-unsigned long lastPublishTime; // Last time the values were published
-unsigned long publishInterval = 5000; // Interval between publishes
+unsigned long lastUpdateTime;                  // Last time the values were published
+unsigned long updateSensorDataInterval = 5000; // Interval to update sensor data
 
 void setup()
 {
@@ -26,8 +28,11 @@ void setup()
   // Initialize sensors
   sensorManager.setup();
 
-  // Setup CommunicationManager
-  communicationManager.setup();
+  // Register PublishManager for sensor data updates
+  sensorManager.registerSubscriberForUpdateSensorData(&pubManager);
+
+  // Setup PublishManager
+  pubManager.setup();
 }
 
 void loop()
@@ -38,18 +43,10 @@ void loop()
   // Get current time
   unsigned long currentTime = millis();
 
-  // If the time since the last publish is greater than the interval,
-  // read sensor data and publish the values
-  if (currentTime - lastPublishTime >= publishInterval)
+  // Update sensor data if the interval has passed
+  if (currentTime - lastUpdateTime >= updateSensorDataInterval)
   {
-      lastPublishTime = currentTime;
-
-      SensorData sensorData = sensorManager.getSensorData();
-
-      // Periodically publish sensor values
-      communicationManager.publishOnSerial(sensorData);
-
-      // Publish sensor values on mqtt
-      communicationManager.publishOnMqtt(sensorData);
+    lastUpdateTime = currentTime;
+    sensorManager.updateSensorData();
   }
 }

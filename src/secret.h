@@ -1,3 +1,5 @@
+// secret.h
+
 // WLAN settings
 const char *ssid = "";
 const char *password = "";

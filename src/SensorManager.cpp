@@ -1,3 +1,5 @@
+// SensorManager.cpp
+
 #include "SensorManager.h"
 #include "SensorData.h"
 #include <Wire.h>
@@ -30,6 +32,20 @@ bool SensorManager::setup()
         return false;
     }
     return true;
+}
+
+// Method to subscribe to the event
+void SensorManager::registerSubscriberForUpdateSensorData(IPublisher *publisher)
+{
+    publishers.push_back(publisher);
+}
+
+// Method to unsubscribe from the event
+void SensorManager::unsubscribeFromSensorDataEvent(IPublisher *publisher)
+{
+    publishers.erase(
+        std::remove(publishers.begin(), publishers.end(), publisher),
+        publishers.end());
 }
 
 // Read temperature from SHT30 sensor
@@ -87,9 +103,10 @@ uint16_t SensorManager::readH2()
 }
 
 // Get sensor data from all sensors
-SensorData SensorManager::getSensorData()
+void SensorManager::updateSensorData()
 {
     SensorData sensorData;
+
     sensorData.temperature = readTemperature();
     sensorData.humidity = readHumidity();
     sensorData.tvoc = readTVOC();
@@ -97,5 +114,10 @@ SensorData SensorManager::getSensorData()
     sensorData.rawEthanol = readEthanol();
     sensorData.rawH2 = readH2();
     sensorData.lightLevel = readLightLevel();
-    return sensorData;
+
+    // Notify all subscribers
+    for (auto *publisher : publishers)
+    {
+        publisher->publish(sensorData);
+    }
 }
