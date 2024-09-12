@@ -17,7 +17,6 @@ public:
 
     void publish(const SensorData &data) override
     {
-        publishOnSerial(data);
         publishOnMqtt(data);
     }
 
@@ -25,8 +24,6 @@ public:
     String deviceName;
 
     void setup();
-    // Method to publish sensor values on Serial
-    void publishOnSerial(SensorData sensorData);
     // Method to publish sensor values on mqtt
     void publishOnMqtt(SensorData sensorData);
 

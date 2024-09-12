@@ -2,11 +2,13 @@
 
 #include <Arduino.h>
 #include "SensorManager.h"
+#include "SerialPublisher.h"
 #include "PublishManager.h"
 #include "OtaManager.h"
 
 // Create instances of SensorManager and PublishManager
 SensorManager sensorManager;
+SerialPublisher serialPublisher;
 PublishManager pubManager;
 OtaManager otaManager;
 
@@ -15,18 +17,17 @@ unsigned long updateSensorDataInterval = 5000; // Interval to update sensor data
 
 void setup()
 {
-  Serial.begin(115200);
-  while (!Serial)
-  {
-    delay(10);
-  }
-  Serial.println("Welcome to AZ-ONEBoard!");
+  // SerialPubslisher setup
+  serialPublisher.setup();
 
   // Setup OTA
   otaManager.setup();
 
   // Initialize sensors
   sensorManager.setup();
+
+  // Register SerialPublisher for sensor data updates
+  sensorManager.registerSubscriberForUpdateSensorData(&serialPublisher);
 
   // Register PublishManager for sensor data updates
   sensorManager.registerSubscriberForUpdateSensorData(&pubManager);

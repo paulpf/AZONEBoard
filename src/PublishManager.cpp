@@ -307,26 +307,6 @@ void PublishManager::mqttCallback(char *topic, byte *payload, unsigned int lengt
     }
 }
 
-// Method to publish sensor values on Serial
-void PublishManager::publishOnSerial(SensorData sensorData)
-{
-    lastSensorData = sensorData;
-    // Print sensor values to the serial
-    Serial.print("Temperature: ");
-    Serial.print(sensorData.temperature, 2); // Print temperature with 2 decimal places
-    Serial.print(" C, Humidity: ");
-    Serial.print(sensorData.humidity, 2); // Print humidity with 2 decimal places
-    Serial.print(" %, TVOC: ");
-    Serial.print(sensorData.tvoc);
-    Serial.print(" ppb, CO2: ");
-    Serial.print(sensorData.co2);
-    Serial.print(" ppm, Raw ethanol: ");
-    Serial.print(sensorData.rawEthanol);
-    Serial.print(", Raw H2: ");
-    Serial.print(sensorData.rawH2);
-    Serial.println();
-}
-
 // Method to publish sensor values on mqtt
 void PublishManager::publishOnMqtt(SensorData sensorData)
 {
