@@ -1,20 +1,14 @@
 // main.cpp
 
 #include <Arduino.h>
-#include "SensorManager.h"
+#include "./Sensors/SensorManager.h"
 #include "./Publishers/Serial/SerialPublisher.h"
 #include "./Publishers/Mqtt/MqttPublisher.h"
 #include "./Publishers/Webserver/WebserverPublisher.h"
-#include "OtaManager.h"
+#include "./_infra/EspWifiClient.h"
+#include "./_infra/OtaManager.h"
 
-#ifdef USE_PRIVATE_SECRET
-#include "../../_secrets/WifiSecret.h"
-#else
-#include "./_secrets/WifiSecret.h"
-#endif
-
-WiFiClient espClient;
-
+EspWifiClient espWifiClient;
 SensorManager sensorManager;
 SerialPublisher serialPublisher;
 MqttPublisher mqttPublisher;
@@ -24,18 +18,19 @@ OtaManager otaManager;
 unsigned long lastUpdateTime;                  // Last time the values were published
 unsigned long updateSensorDataInterval = 5000; // Interval to update sensor data
 
-void setupWifi();
-String getDeviceName();
-
 void setup()
 {
   // SerialPubslisher setup
   serialPublisher.setup();
 
-  setupWifi();
+  espWifiClient.setup();
+
+  // Get wifiClient and deviceName
+  WiFiClient *wifiClient = espWifiClient.getWifiClient();
+  String deviceName = espWifiClient.getDeviceName();
 
   // MqttPublisher setup
-  mqttPublisher.setup(&espClient, getDeviceName());
+  mqttPublisher.setup(wifiClient, deviceName);
 
   // Setup OTA
   otaManager.setup();
@@ -54,28 +49,6 @@ void setup()
 
   // Register PublishManager for sensor data updates
   sensorManager.registerSubscriberForUpdateSensorData(&wsPublisher);
-}
-
-void setupWifi()
-{
-    espClient = WiFiClient();
-
-    WiFi.begin(ssid, password);
-    while (WiFi.status() != WL_CONNECTED)
-    {
-        delay(500);
-        Serial.print(".");
-    }
-    Serial.println("WiFi connected");    
-}
-
-// Method to get device name
-String getDeviceName()
-{
-    String deviceName = "AZ-ONEBoard/";
-    deviceName += WiFi.macAddress();
-    deviceName.replace(":", "");
-    return deviceName;
 }
 
 void loop()
