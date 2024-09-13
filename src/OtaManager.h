@@ -1,7 +1,7 @@
 // OtaManager.h
 
-#ifndef OTAMANAGER_H
-#define OTAMANAGER_H
+#ifndef OTA_MANAGER_H
+#define OTA_MANAGER_H
 
 #include <ArduinoOTA.h>
 
@@ -16,4 +16,4 @@ public:
     void handle();
 };
 
-#endif // OTAMANAGER_H
+#endif // OTA_MANAGER_H

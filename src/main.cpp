@@ -3,25 +3,45 @@
 #include <Arduino.h>
 #include "SensorManager.h"
 #include "SerialPublisher.h"
-#include "PublishManager.h"
+#include "MqttPublisher.h"
+#include "WebserverPublisher.h"
 #include "OtaManager.h"
 
-// Create instances of SensorManager and PublishManager
+#ifdef USE_PRIVATE_SECRET
+#include "../../_secrets/WifiSecret.h"
+#else
+#include "WifiSecret.h"
+#endif
+
+WiFiClient espClient;
+
 SensorManager sensorManager;
 SerialPublisher serialPublisher;
-PublishManager pubManager;
+MqttPublisher mqttPublisher;
+WebserverPublisher wsPublisher;
 OtaManager otaManager;
 
 unsigned long lastUpdateTime;                  // Last time the values were published
 unsigned long updateSensorDataInterval = 5000; // Interval to update sensor data
+
+void setupWifi();
+String getDeviceName();
 
 void setup()
 {
   // SerialPubslisher setup
   serialPublisher.setup();
 
+  setupWifi();
+
+  // MqttPublisher setup
+  mqttPublisher.setup(&espClient, getDeviceName());
+
   // Setup OTA
   otaManager.setup();
+
+  // Setup WebserverPublisher
+  wsPublisher.setup();
 
   // Initialize sensors
   sensorManager.setup();
@@ -29,11 +49,33 @@ void setup()
   // Register SerialPublisher for sensor data updates
   sensorManager.registerSubscriberForUpdateSensorData(&serialPublisher);
 
-  // Register PublishManager for sensor data updates
-  sensorManager.registerSubscriberForUpdateSensorData(&pubManager);
+  // Register MqttPublisher for sensor data updates
+  sensorManager.registerSubscriberForUpdateSensorData(&mqttPublisher);
 
-  // Setup PublishManager
-  pubManager.setup();
+  // Register PublishManager for sensor data updates
+  sensorManager.registerSubscriberForUpdateSensorData(&wsPublisher);
+}
+
+void setupWifi()
+{
+    espClient = WiFiClient();
+
+    WiFi.begin(ssid, password);
+    while (WiFi.status() != WL_CONNECTED)
+    {
+        delay(500);
+        Serial.print(".");
+    }
+    Serial.println("WiFi connected");    
+}
+
+// Method to get device name
+String getDeviceName()
+{
+    String deviceName = "AZ-ONEBoard/";
+    deviceName += WiFi.macAddress();
+    deviceName.replace(":", "");
+    return deviceName;
 }
 
 void loop()
