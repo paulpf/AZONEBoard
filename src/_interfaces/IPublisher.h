@@ -5,7 +5,7 @@
 
 #pragma once
 
-#include "SensorData.h"
+#include "./_structures/SensorData.h"
 
 class IPublisher
 {

@@ -3,8 +3,8 @@
 #ifndef MQTT_PUBLISHER_H
 #define MQTT_PUBLISHER_H
 
-#include "SensorData.h"
-#include "IPublisher.h"
+#include "./_structures/SensorData.h"
+#include "../../_interfaces/IPublisher.h"
 #include <ESP8266WiFi.h>
 #include <PubSubClient.h>
 

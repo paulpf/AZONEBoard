@@ -1,7 +1,7 @@
 // SensorManager.cpp
 
 #include "SensorManager.h"
-#include "SensorData.h"
+#include "./_structures/SensorData.h"
 #include <Wire.h>
 
 // Constructor for SensorManager class

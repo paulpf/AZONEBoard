@@ -3,8 +3,8 @@
 #ifndef SERIAL_PUBLISHER_H
 #define SERIAL_PUBLISHER_H
 
-#include "SensorData.h"
-#include "IPublisher.h"
+#include "./_structures/SensorData.h"
+#include "../../_interfaces/IPublisher.h"
 
 class SerialPublisher : public IPublisher
 {

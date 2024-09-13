@@ -3,8 +3,8 @@
 #ifndef WEBSERVER_PUBLISHER_H
 #define WEBSERVER_PUBLISHER_H
 
-#include "IPublisher.h"
-#include "SensorData.h"
+#include "./_structures/SensorData.h"
+#include "../../_interfaces/IPublisher.h"
 
 class WebserverPublisher : public IPublisher
 {

@@ -2,15 +2,15 @@
 
 #include <Arduino.h>
 #include "SensorManager.h"
-#include "SerialPublisher.h"
-#include "MqttPublisher.h"
-#include "WebserverPublisher.h"
+#include "./Publishers/Serial/SerialPublisher.h"
+#include "./Publishers/Mqtt/MqttPublisher.h"
+#include "./Publishers/Webserver/WebserverPublisher.h"
 #include "OtaManager.h"
 
 #ifdef USE_PRIVATE_SECRET
 #include "../../_secrets/WifiSecret.h"
 #else
-#include "WifiSecret.h"
+#include "./_secrets/WifiSecret.h"
 #endif
 
 WiFiClient espClient;

@@ -5,17 +5,15 @@
 #ifndef SENSOR_MANAGER_H
 #define SENSOR_MANAGER_H
 
-#include "IPublisher.h"
+#include <vector>
+#include <functional>
+#include "./_interfaces/IPublisher.h"
+#include "./_structures/SensorData.h"
 
 // Include necessary sensor libraries
 #include <WEMOS_SHT3X.h>
 #include <Adafruit_SGP30.h>
 #include <BH1750.h>
-
-#include <vector>
-#include <functional>
-
-#include "SensorData.h"
 
 // SensorManager class to manage multiple sensors
 class SensorManager
