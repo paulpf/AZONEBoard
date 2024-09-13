@@ -36,7 +36,7 @@ void setup()
   otaManager.setup();
 
   // Setup WebserverPublisher
-  wsPublisher.setup();
+  wsPublisher.setup(deviceName);
 
   // Initialize sensors
   sensorManager.setup();

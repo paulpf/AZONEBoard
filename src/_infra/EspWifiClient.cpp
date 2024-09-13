@@ -22,7 +22,8 @@ void EspWifiClient::setup()
         delay(500);
         Serial.print(".");
     }
-    Serial.println("WiFi connected");    
+    Serial.println("WiFi connected at IP address: ");
+    Serial.println(WiFi.localIP());
 }
 
 WiFiClient *EspWifiClient::getWifiClient()
