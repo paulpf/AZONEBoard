@@ -5,7 +5,7 @@
 
 # AZONEBoard
 
-AZONEBoard is a project for the AZ-ONEBoard from AZ-Delivery. This board includes 3 environmental sensors and can measure the following values:
+AZONEBoard is a private project for the AZ-ONEBoard from AZ-Delivery. This board includes 3 environmental sensors and can measure the following values:
 - Temperature
 - Humidity
 - Ambient light
