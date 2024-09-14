@@ -55,8 +55,8 @@ void WebserverPublisher::handleRoot()
   html += "<p>Raw Ethanol: " + String(instance->lastData.rawEthanol) + "</p>";
   html += "</body></html>";
   
-  // Send the html site
-  instance->webServer.send(200, "text/html", html);
+  // Send the html site with content-type header including charset=utf-8
+  instance->webServer.send(200, "text/html; charset=utf-8", html);
 }
 
 void WebserverPublisher::handleData()
@@ -95,5 +95,5 @@ void WebserverPublisher::updateWebpage()
     html += "</body></html>";
   
     // Send the html site
-    webServer.send(200, "text/html", html);
+    webServer.send(200, "text/html; charset=utf-8", html);
 }
