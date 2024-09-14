@@ -1,5 +1,3 @@
-// main.cpp
-
 #include <Arduino.h>
 #include "./Sensors/SensorManager.h"
 #include "./Publishers/Serial/SerialPublisher.h"
@@ -20,49 +18,53 @@ unsigned long updateSensorDataInterval = 5000; // Interval to update sensor data
 
 void setup()
 {
-  // SerialPubslisher setup
-  serialPublisher.setup();
+    // SerialPublisher setup
+    serialPublisher.setup();
 
-  espWifiClient.setup();
+    // EspWifiClient setup
+    espWifiClient.setup();
 
-  // Get wifiClient and deviceName
-  WiFiClient *wifiClient = espWifiClient.getWifiClient();
-  String deviceName = espWifiClient.getDeviceName();
+    // Get wifiClient and deviceName
+    WiFiClient *wifiClient = espWifiClient.getWifiClient();
+    String deviceName = espWifiClient.getDeviceName();
 
-  // MqttPublisher setup
-  mqttPublisher.setup(wifiClient, deviceName);
+    // MqttPublisher setup
+    mqttPublisher.setup(wifiClient, deviceName);
 
-  // Setup OTA
-  otaManager.setup();
+    // Setup OTA
+    otaManager.setup();
 
-  // Setup WebserverPublisher
-  wsPublisher.setup(deviceName);
+    // Setup WebserverPublisher
+    wsPublisher.setup(deviceName);
 
-  // Initialize sensors
-  sensorManager.setup();
+    // Initialize sensors
+    sensorManager.setup();
 
-  // Register SerialPublisher for sensor data updates
-  sensorManager.registerSubscriberForUpdateSensorData(&serialPublisher);
+    // Register SerialPublisher for sensor data updates
+    sensorManager.registerSubscriberForUpdateSensorData(&serialPublisher);
 
-  // Register MqttPublisher for sensor data updates
-  sensorManager.registerSubscriberForUpdateSensorData(&mqttPublisher);
+    // Register MqttPublisher for sensor data updates
+    sensorManager.registerSubscriberForUpdateSensorData(&mqttPublisher);
 
-  // Register PublishManager for sensor data updates
-  sensorManager.registerSubscriberForUpdateSensorData(&wsPublisher);
+    // Register WebserverPublisher for sensor data updates
+    sensorManager.registerSubscriberForUpdateSensorData(&wsPublisher);
 }
 
 void loop()
 {
-  // Handle OTA
-  otaManager.handle();
+    // Handle OTA
+    otaManager.handle();
 
-  // Get current time
-  unsigned long currentTime = millis();
+    // Handle WebserverPublisher
+    wsPublisher.handle();
 
-  // Update sensor data if the interval has passed
-  if (currentTime - lastUpdateTime >= updateSensorDataInterval)
-  {
-    lastUpdateTime = currentTime;
-    sensorManager.updateSensorData();
-  }
+    // Get current time
+    unsigned long currentTime = millis();
+
+    // Update sensor data if the interval has passed
+    if (currentTime - lastUpdateTime >= updateSensorDataInterval)
+    {
+        lastUpdateTime = currentTime;
+        sensorManager.updateSensorData();
+    }
 }
