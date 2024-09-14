@@ -21,8 +21,6 @@ private:
     ESP8266WebServer webServer;
     String deviceName;
     static void handleRoot();
-    static void handleData();
-    void updateWebpage(); // Neue Methode zum Aktualisieren der Webseite
 };
 
 #endif // WEBSERVER_PUBLISHER_H
