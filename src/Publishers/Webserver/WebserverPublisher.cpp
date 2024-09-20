@@ -50,6 +50,7 @@ void WebserverPublisher::handleRoot()
   html += "<p>Light: " + String(instance->lastData.lightLevel) + " lux</p>";
   html += "<p>Raw H2: " + String(instance->lastData.rawH2) + "</p>";
   html += "<p>Raw Ethanol: " + String(instance->lastData.rawEthanol) + "</p>";
+  html += "<p>Errors: " + instance->lastData.errors + "</p>";
   html += "</body></html>";
   
   // Send the html site with content-type header including charset=utf-8

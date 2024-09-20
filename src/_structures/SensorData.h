@@ -3,7 +3,9 @@
 #ifndef SENSOR_DATA_H
 #define SENSOR_DATA_H
 
+#include <Arduino.h>
 #include <inttypes.h>
+#include <string>
 
 struct SensorData
 {
@@ -14,6 +16,7 @@ struct SensorData
     uint16_t lightLevel;
     uint16_t rawH2 = 0;
     uint16_t rawEthanol = 0;
+    String errors;
 };
 
 #endif // SENSOR_DATA_H

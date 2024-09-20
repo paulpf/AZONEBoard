@@ -5,6 +5,7 @@
 #include <ESP8266WiFi.h>
 #include "../../_structures/TopicValuePair.h"
 #include "../../_structures/CommonData.h"
+#include "../../_interfaces/delegates.h"
 
 #ifdef USE_PRIVATE_SECRET
 #include "../../_secrets/MqttSecret.h"
@@ -51,8 +52,8 @@ void MqttPublisher::mqttCallback(char *topic, byte *payload, unsigned int length
             Serial.print("Updating updateSensorDataInterval to ");
             Serial.println(newValue);
 
-           // Call updateSensorDataIntervalCallback with the new value
-            instance->callbackFunction(newValue);
+           // Call callback function with the new value
+            instance->updateSensorDataInterval(newValue);
         }
     }
 }
@@ -73,10 +74,15 @@ void MqttPublisher::publish(const SensorData &sensorData)
         {instance->deviceName + "/tvoc", String(sensorData.tvoc)},
         {instance->deviceName + "/co2", String(sensorData.co2)},
         {instance->deviceName + "/rawEthanol", String(sensorData.rawEthanol)},
-        {instance->deviceName + "/rawH2", String(sensorData.rawH2)}
+        {instance->deviceName + "/rawH2", String(sensorData.rawH2)},
+        {instance->deviceName + "/lightLevel", String(sensorData.lightLevel)},
+        {instance->deviceName + "/errors", sensorData.errors}
     };
 
-    publishInternal(topics, 6);
+    // Get count of topics
+    size_t count = sizeof(topics) / sizeof(topics[0]);
+
+    publishInternal(topics, count);
 }
 
 // Method to reconnect to the mqtt broker
@@ -136,7 +142,7 @@ void MqttPublisher::publishInternal(TopicValuePair *topics, size_t count)
     }
 }
 
-void MqttPublisher::setCallback(void (*callback)(int))
+void MqttPublisher::registerCallback(void (*updateSensorDataInterval)(int))
 {
-    instance->callbackFunction = callback;
+    instance->updateSensorDataInterval = updateSensorDataInterval;
 }

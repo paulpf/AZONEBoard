@@ -5,6 +5,7 @@
 
 #include "./_structures/SensorData.h"
 #include "../../_interfaces/IPublisher.h"
+#include "../../_interfaces/delegates.h"
 #include <ESP8266WiFi.h>
 #include <PubSubClient.h>
 #include "./_structures/CommonData.h"
@@ -17,7 +18,7 @@ public:
     void setup(WiFiClient *wifiClient, String deviceName);
     void publish(const SensorData &data);
     void publishCommonData(const CommonData &commonData);
-    void setCallback(void (*callback)(int));
+    void registerCallback(void (*updateSensorDataInterval)(int));
 
 private:
     static MqttPublisher *instance; // Static pointer to the instance
@@ -27,8 +28,8 @@ private:
     static void mqttCallback(char *topic, byte *payload, unsigned int length);
     void reconnectMqtt();
     void publishInternal(TopicValuePair *topics, size_t count);
-    //void callbackFunction(int newValue);
     void (*callbackFunction)(int);
+    CallbackDelegate updateSensorDataInterval;
 };
 
 #endif // MQTT_PUBLISHER_H

@@ -46,13 +46,19 @@ private:
 	BH1750 lightMeter;	  // Light level sensor
 
 	// Methods to read data from each sensor
-	float readTemperature();   // Read temperature from SHT30
-	float readHumidity();	   // Read humidity from SHT30
+    float readTemperature(); // Read temperature from SHT30
+    bool readSht30();
+	bool readSgp30();
+	bool readSgp30Raw();
+    float readHumidity();	   // Read humidity from SHT30
 	uint16_t readTVOC();	   // Read TVOC from SGP30
 	uint16_t readCO2();		   // Read CO2 from SGP30
 	uint16_t readEthanol();	   // Read raw ethanol value from SGP30
 	uint16_t readH2();		   // Read raw H2 value from SGP30
 	uint16_t readLightLevel(); // Read light level from BH1750
+
+	// dynamic Array with errors strings during reading sensors
+	std::vector<String> errors;
 };
 
 #endif // SENSOR_MANAGER_H

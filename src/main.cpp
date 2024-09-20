@@ -54,7 +54,7 @@ void setup()
     mqttPublisher.setup(wifiClient, deviceName);
 
     // Subscribe to the topic to update the updateSensorDataInterval
-    mqttPublisher.setCallback(updateSensorDataIntervalCallback);
+    mqttPublisher.registerCallback(updateSensorDataIntervalCallback);
 
     // Setup OTA
     otaManager.setup();
