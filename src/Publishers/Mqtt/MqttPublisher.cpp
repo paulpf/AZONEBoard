@@ -3,6 +3,8 @@
 #include "MqttPublisher.h"
 #include <Arduino.h>
 #include <ESP8266WiFi.h>
+#include "../../_structures/TopicValuePair.h"
+#include "../../_structures/CommonData.h"
 
 #ifdef USE_PRIVATE_SECRET
 #include "../../_secrets/MqttSecret.h"
@@ -40,14 +42,17 @@ void MqttPublisher::mqttCallback(char *topic, byte *payload, unsigned int length
         message += (char)payload[i];
     }
 
-    if (String(topic) == (instance->deviceName + "/dataUpdateTime"))
+    if (String(topic) == (instance->deviceName + "/updateSensorDataInterval"))
     {
-        // Update dataUpdateTime
+        // Update updateSensorDataInterval
         int newValue = message.toInt();
         if (newValue > 0)
         {
-            Serial.print("Updating dataUpdateTime to ");
+            Serial.print("Updating updateSensorDataInterval to ");
             Serial.println(newValue);
+
+           // Call updateSensorDataIntervalCallback with the new value
+            instance->callbackFunction(newValue);
         }
     }
 }
@@ -61,37 +66,17 @@ void MqttPublisher::publish(const SensorData &sensorData)
     }
     mqttClient.loop();
 
-    // Publish sensor values
-    if (mqttClient.publish((instance->deviceName + "/temperature").c_str(), String(sensorData.temperature).c_str()) == false)
+    TopicValuePair topics[] = 
     {
-        Serial.println("Temperature not published");
-    }
-    if (mqttClient.publish((instance->deviceName + "/humidity").c_str(), String(sensorData.humidity).c_str()) == false)
-    {
-        Serial.println("Humidity not published");
-    }
-    if (mqttClient.publish((instance->deviceName + "/tvoc").c_str(), String(sensorData.tvoc).c_str()) == false)
-    {
-        Serial.println("TVOC not published");
-    }
-    if (mqttClient.publish((instance->deviceName + "/co2").c_str(), String(sensorData.co2).c_str()) == false)
-    {
-        Serial.println("CO2 not published");
-    }
-    if (mqttClient.publish((instance->deviceName + "/rawEthanol").c_str(), String(sensorData.rawEthanol).c_str()) == false)
-    {
-        Serial.println("Raw ethanol not published");
-    }
-    if (mqttClient.publish((instance->deviceName + "/rawH2").c_str(), String(sensorData.rawH2).c_str()) == false)
-    {
-        Serial.println("Raw H2 not published");
-    }
+        {instance->deviceName + "/temperature", String(sensorData.temperature)},
+        {instance->deviceName + "/humidity", String(sensorData.humidity)},
+        {instance->deviceName + "/tvoc", String(sensorData.tvoc)},
+        {instance->deviceName + "/co2", String(sensorData.co2)},
+        {instance->deviceName + "/rawEthanol", String(sensorData.rawEthanol)},
+        {instance->deviceName + "/rawH2", String(sensorData.rawH2)}
+    };
 
-    // Publish ip address
-    if (mqttClient.publish((instance->deviceName + "/ipAddress").c_str(), instance->ipAddress.toString().c_str()) == false)
-    {
-        Serial.println("IP address not published");
-    }
+    publishInternal(topics, 6);
 }
 
 // Method to reconnect to the mqtt broker
@@ -105,6 +90,9 @@ void MqttPublisher::reconnectMqtt()
         if (mqttClient.connect(deviceName.c_str(), mqtt_user, mqtt_password))
         {
             Serial.println("connected");
+
+            // Subscribe to messages
+            mqttClient.subscribe((instance->deviceName + "/updateSensorDataInterval").c_str());
         }
         else
         {
@@ -115,4 +103,40 @@ void MqttPublisher::reconnectMqtt()
             delay(5000);
         }
     }
+}
+
+void MqttPublisher::publishCommonData(const CommonData &commonData)
+{
+    // Connect to the mqtt broker
+    if (!mqttClient.connected())
+    {
+        instance->reconnectMqtt();
+    }
+    mqttClient.loop();
+
+    TopicValuePair topics[] = 
+    {
+        {instance->deviceName + "/ipAddress", instance->ipAddress.toString()},
+        {instance->deviceName + "/updateSensorDataInterval", String(commonData.updateSensorDataInterval)}
+    };
+
+    instance->publishInternal(topics, 2);
+}
+
+void MqttPublisher::publishInternal(TopicValuePair *topics, size_t count)
+{
+    // Iterate over the array and publish each topic
+    for (size_t i = 0; i < count; ++i)
+    {
+        const auto &topicValuePair = topics[i];
+        if (mqttClient.publish(topicValuePair.topic.c_str(), topicValuePair.value.c_str()) == false)
+        {
+            Serial.println(topicValuePair.topic + " not published");
+        }
+    }
+}
+
+void MqttPublisher::setCallback(void (*callback)(int))
+{
+    instance->callbackFunction = callback;
 }

@@ -5,6 +5,7 @@
 #include "./Publishers/Webserver/WebserverPublisher.h"
 #include "./_infra/EspWifiClient.h"
 #include "./_infra/OtaManager.h"
+#include "./_infra/EepromManager.h"
 
 EspWifiClient espWifiClient;
 SensorManager sensorManager;
@@ -12,12 +13,33 @@ SerialPublisher serialPublisher;
 MqttPublisher mqttPublisher;
 WebserverPublisher wsPublisher;
 OtaManager otaManager;
+EepromManager eepromManager;
 
-unsigned long lastUpdateTime;                  // Last time the values were published
-unsigned long updateSensorDataInterval = 5000; // Interval to update sensor data
+unsigned long lastSensorUpdateTime;                  // Last time the values were updated
+unsigned long lastCommonDataUpdateTime;              // Last time the common data was updated
+unsigned long updateSensorDataInterval; // Interval to update sensor data
+unsigned long defaultUpdateSensorDataInterval = 5000; // Interval to update sensor data
+unsigned long UpdateCommonDataInterval = 60000 * 5;
+
+void updateSensorDataIntervalCallback(int newValue)
+{
+    updateSensorDataInterval = newValue;
+    eepromManager.writeUpdateSensorDataInterval(newValue);
+}
+
+void publishAtSetup()
+{
+    CommonData commonData;
+    commonData.updateSensorDataInterval = updateSensorDataInterval;
+    Serial.println("Publishing common data");
+    mqttPublisher.publishCommonData(commonData);
+}
 
 void setup()
 {
+    // Read updateSensorDataInterval from EEPROM
+    updateSensorDataInterval = eepromManager.readUpdateSensorDataInterval(defaultUpdateSensorDataInterval);
+
     // SerialPublisher setup
     serialPublisher.setup();
 
@@ -31,6 +53,9 @@ void setup()
     // MqttPublisher setup
     mqttPublisher.setup(wifiClient, deviceName);
 
+    // Subscribe to the topic to update the updateSensorDataInterval
+    mqttPublisher.setCallback(updateSensorDataIntervalCallback);
+
     // Setup OTA
     otaManager.setup();
 
@@ -39,6 +64,8 @@ void setup()
 
     // Initialize sensors
     sensorManager.setup();
+
+    publishAtSetup();
 
     // Register SerialPublisher for sensor data updates
     sensorManager.registerSubscriberForUpdateSensorData(&serialPublisher);
@@ -62,9 +89,12 @@ void loop()
     unsigned long currentTime = millis();
 
     // Update sensor data if the interval has passed
-    if (currentTime - lastUpdateTime >= updateSensorDataInterval)
+    if (currentTime - lastSensorUpdateTime >= updateSensorDataInterval)
     {
-        lastUpdateTime = currentTime;
+        lastSensorUpdateTime = currentTime;
         sensorManager.updateSensorData();
     }
+
+    // Wait for a while
+    delay(100);
 }

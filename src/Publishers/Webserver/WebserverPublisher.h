@@ -4,7 +4,6 @@
 #include "./_structures/SensorData.h"
 #include "../../_interfaces/IPublisher.h"
 #include <ESP8266WebServer.h>
-#include <WebSocketsServer.h> // Hinzufügen der WebSocket-Bibliothek
 
 class WebserverPublisher : public IPublisher
 {

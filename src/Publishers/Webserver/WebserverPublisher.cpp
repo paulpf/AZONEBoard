@@ -3,8 +3,6 @@
 #include "config.h"
 #include "ESP8266WebServer.h"
 #include <ESP8266mDNS.h>
-#include <ArduinoJson.h>
-#include <WebSocketsServer.h> // Hinzufügen der WebSocket-Bibliothek
 
 WebserverPublisher *WebserverPublisher::instance = 0;
 
