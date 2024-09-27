@@ -6,6 +6,7 @@
     - [SerialPublisher](#serialpublisher)
     - [WebserverPublisher](#webserverpublisher)
     - [MqttPublisher](#mqttpublisher)
+4. [3D-printed Case for the AZ-ONEBoard](#3d-printed-case-for-the-az-oneboard)
 
 ---
 
