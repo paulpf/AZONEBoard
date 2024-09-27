@@ -1,13 +1,11 @@
-# 🚧 This documentation is still under construction! 🚧
-
 ## Table of Contents
 
 1. [Introduction](#introduction)
-2. [Publishers](#publishers)
-    - [MqttPublisher](#mqttpublisher)
-    - [WebserverPublisher](#webserverpublisher)
-    - [SerialPublisher](#serialpublisher)
 2. [Getting Started](#getting-started)
+3. [Publishers](#publishers)
+    - [SerialPublisher](#serialpublisher)
+    - [WebserverPublisher](#webserverpublisher)
+    - [MqttPublisher](#mqttpublisher)
 
 ---
 
@@ -36,46 +34,6 @@ This project is implemented using the **Object-Oriented Programming (OOP)** para
 
 By using the OOP paradigm, the project achieves modularity, making it easier to manage, extend, and maintain. Each class is responsible for a specific aspect of the project, promoting a clean and organized codebase.
 
-## Publishers
-
-In this project, three publisher classes have been implemented to publish sensor data in various ways: via MQTT, a serial interface, and a web server.
-
-### MqttPublisher
-
-The `MqttPublisher` class publishes sensor data using the MQTT protocol. It connects to an MQTT broker and sends the sensor data to predefined topics. The class provides the following main functions:
-
-- **Setup**: Initializes the MQTT client and sets the connection parameters.
-- **Callback**: Processes incoming MQTT messages and updates the `updateSensorDataInterval` variable.
-- **Publish**: Publishes sensor data to various MQTT topics.
-- **Reconnect**: Re-establishes the connection to the MQTT broker if it is lost.
-- **RegisterCallback**: Registers a callback function to update the sensor data interval.
-
-You can configure, for example, ioBroker to read values via MQTT.
-
-<img src="./attachments/iobroker_mqtt.png" alt="ioBroker MQTT" style="width:800px; height:auto;">
-
-### WebserverPublisher
-
-The `WebserverPublisher` class provides a web server that displays the sensor data on an HTML page. The main functions include:
-
-- **Setup**: Initializes the web server and sets the device name.
-- **Handle**: Processes incoming HTTP requests.
-- **Publish**: Updates the HTML page with the latest sensor data.
-- **HandleRoot**: Generates the HTML page with the sensor data and sends it to the client.
-
-This image shows the web server interface displaying sensor data. The webpage will be updated automatically when new sensor values are available.
-
-<img src="./attachments/webserver.png" alt="Webserver" style="width:800px; height:auto;">
-
-### SerialPublisher
-
-The `SerialPublisher` class publishes sensor data via the serial interface. You can use it, for example, during debugging. The main functions include:
-
-- **Setup**: Initializes the serial interface.
-- **Publish**: Sends the sensor data over the serial interface to the connected computer or another serial device.
-
-These publisher classes enable the project to flexibly publish and process sensor data through various communication channels.
-
 # Getting Started
 
 To get the project up and running, you first need to set up your development environment. Follow these steps:
@@ -99,28 +57,21 @@ In this project, there exist four sections in the `platformio.ini` file:
 
 * **[env:esp12e-ota-dev]**: This section is similar to the `esp12e-ota` section but is intended for development purposes. It also includes the additional build flag (`-DUSE_PRIVATE_SECRET`) and specifies the upload port for OTA updates.
 
-Each section allows for different configurations and settings, enabling you to easily switch between USB and OTA uploads, as well as between production and development environments.
-
-After clone this repository you have to edit WifiSecret.h add your Wifi credentials.
+Each section allows for different configurations and settings, enabling you to easily switch between USB and OTA uploads, as well as between production and development environments. The sections with the ending `-dev` are intended for using secret information, which is not a part of this project. For example, you can use the `-dev` sections to test your project with your own WiFi and MQTT credentials, what will not be pushed to the repository. Here is a code snippet from the `MqttPublisher.cpp` file, where the secret information is included:
 
 ```cpp
-const char *ssid = "your_SSID";
-const char *password = "your_PASSWORD";
+#ifdef USE_PRIVATE_SECRET
+#include "../../_secrets/MqttSecret.h"
+#include "../../_configs/MqttConfig.h"
+#else
+#include "MqttSecret.h"
+#include "MqttConfig.h"
+#endif
 ```
 
-Also you have to edit MqttConfig.h to add your MQTT server:
+If you want to use the `-dev` sections, you have to create the `_secrets` and `_configs` folders in the directory two levels above the `src` folder. Inside the `_secrets` folder, you have to create the `MqttSecret.h` and `WifiSecret.h` files.
 
-```cpp
-const char *mqtt_server = "your_MQTT";
-const int mqtt_port = 1884;
-```
-
-and MqttSecret.h to add MQTT credentials:
-
-```cpp
-const char *mqtt_user = "your_MQTT_USER";
-const char *mqtt_password = "your_MQTT_PASSWORD";
-```
+Or you can use the `MqttSecret.h` and `WifiSecret.h` files in the `src` folder. In this case, you have to edit the `MqttSecret.h` and `WifiSecret.h` files to add your WiFi credentials. In this case you have to switch in platformio to the sections without `-dev` to load the project to the ESP.
 
 ## Building the Project
 
@@ -145,6 +96,8 @@ To upload the firmware to the ESP12E board, follow these steps:
 
 The firmware will be uploaded to the ESP12E board, and you can monitor the progress in the terminal.
 
+After the first upload, you can use the OTA upload. To do this, you have to change the section in the `platformio.ini` file from `esp12e-usb` to `esp12e-ota`. Then you can upload the firmware via OTA. The IP address of the ESP12E board is displayed in the serial monitor after the first upload.
+
 ## Running the Project
 
 After uploading the firmware, you can run the project by following these steps:
@@ -155,4 +108,44 @@ After uploading the firmware, you can run the project by following these steps:
 
 You can also access the web server to view the sensor data in a browser. Open a web browser and enter the IP address of the ESP12E board to access the web server.
 
-With these steps, you can build, upload, and run the project on the ESP12E board, publishing sensor data via MQTT, a web server, and the serial interface.
+Also yo ucan use the MQTT client to read the sensor data via MQTT. You can use, for example, ioBroker to read the sensor data.
+
+## Publishers
+
+In this project, three publisher classes have been implemented to publish sensor data in various ways: a serial interface, web server or MQTT. Each publisher class encapsulates the functionality required to publish sensor data through a specific communication channel. The main functions of each publisher class are described below.
+
+### SerialPublisher
+
+The `SerialPublisher` class publishes sensor data via the serial interface. You can use it, for example, during debugging. The main functions include:
+
+- **Setup**: Initializes the serial interface.
+- **Publish**: Sends the sensor data over the serial interface to the connected computer or another serial device.
+
+These publisher classes enable the project to flexibly publish and process sensor data through various communication channels.
+
+### WebserverPublisher
+
+The `WebserverPublisher` class provides a web server that displays the sensor data on an HTML page. The main functions include:
+
+- **Setup**: Initializes the web server and sets the device name.
+- **Handle**: Processes incoming HTTP requests.
+- **Publish**: Updates the HTML page with the latest sensor data.
+- **HandleRoot**: Generates the HTML page with the sensor data and sends it to the client.
+
+This image shows the web server interface displaying sensor data. The webpage will be updated automatically when new sensor values are available.
+
+<img src="./attachments/webserver.png" alt="Webserver" style="width:800px; height:auto;">
+
+### MqttPublisher
+
+The `MqttPublisher` class publishes sensor data using the MQTT protocol. It connects to an MQTT broker and sends the sensor data to predefined topics. The class provides the following main functions:
+
+- **Setup**: Initializes the MQTT client and sets the connection parameters.
+- **Callback**: Processes incoming MQTT messages and updates the `updateSensorDataInterval` variable.
+- **Publish**: Publishes sensor data to various MQTT topics.
+- **Reconnect**: Re-establishes the connection to the MQTT broker if it is lost.
+- **RegisterCallback**: Registers a callback function to update the sensor data interval.
+
+You can configure, for example, ioBroker to read values via MQTT.
+
+<img src="./attachments/iobroker_mqtt.png" alt="ioBroker MQTT" style="width:800px; height:auto;">
