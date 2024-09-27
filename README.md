@@ -149,3 +149,12 @@ The `MqttPublisher` class publishes sensor data using the MQTT protocol. It conn
 You can configure, for example, ioBroker to read values via MQTT.
 
 <img src="./attachments/iobroker_mqtt.png" alt="ioBroker MQTT" style="width:800px; height:auto;">
+
+
+## 3D-printed Case for the AZ-ONEBoard
+
+I have designed a 3D-printed case for the AZ-ONEBoard. The case consists of two parts: a base and a cover. The base holds the AZ-ONEBoard and provides two openings for the holding screws. The cover fits over the base and has openings for the sensors and the USB port. The STL and f3d files are available in the `case` folder.
+
+<img src="./attachments/case1.jpg" alt="3D-printed Case" style="width:800px; height:auto;">
+
+<img src="./attachments/case2.jpg" alt="3D-printed Case" style="width:800px; height:auto;">
