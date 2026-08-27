@@ -2,6 +2,7 @@
 
 #include "SensorManager.h"
 #include "./_structures/SensorData.h"
+#include "trace.h"
 #include <Wire.h>
 
 // Constructor for SensorManager class
@@ -21,14 +22,14 @@ bool SensorManager::setup()
     // Initialize SGP30 sensor
     if (!sgp30.begin())
     {
-        Serial.println("Failed to initialize SGP30 sensor!");
+        Trace::log(TraceLevel::ERROR, "Failed to initialize SGP30 sensor!");
         return false;
     }
 
     // Initialize BH1750 sensor
     if (!lightMeter.begin(BH1750::CONTINUOUS_HIGH_RES_MODE))
     {
-        Serial.println("Failed to initialize BH1750 sensor!");
+        Trace::log(TraceLevel::ERROR, "Failed to initialize BH1750 sensor!");
         return false;
     }
     return true;
@@ -64,7 +65,7 @@ bool SensorManager::readSht30()
     if (sht30.get() != 0)
     {
         errors.push_back("SHT30 sensor reading failed");
-        Serial.println("SHT30 sensor reading failed");
+        Trace::log(TraceLevel::WARNING, "SHT30 sensor reading failed");
         return false;
     }
     return true;
@@ -96,7 +97,7 @@ bool SensorManager::readSgp30()
     if(!sgp30.IAQmeasure())
     {
         errors.push_back("SGP30 IAQmeasure measurement failed");
-        Serial.println("SGP30 IAQmeasure measurement failed");
+        Trace::log(TraceLevel::WARNING, "SGP30 IAQmeasure measurement failed");
         return false;
     }
     return true;
@@ -133,7 +134,7 @@ bool SensorManager::readSgp30Raw()
     if(!sgp30.IAQmeasureRaw())
     {
         errors.push_back("SGP30 IAQmeasureRaw measurement failed");
-        Serial.println("SGP30 IAQmeasureRaw measurement failed");
+        Trace::log(TraceLevel::WARNING, "SGP30 IAQmeasureRaw measurement failed");
         return false;
     }
     return true;

@@ -6,6 +6,7 @@
 #include "../../_structures/TopicValuePair.h"
 #include "../../_structures/CommonData.h"
 #include "../../_interfaces/delegates.h"
+#include "trace.h"
 
 #ifdef USE_PRIVATE_SECRET
 #include "../../_secrets/MqttSecret.h"
@@ -36,7 +37,7 @@ void MqttPublisher::mqttCallback(char *topic, byte *payload, unsigned int length
 {
     String message;
 
-    Serial.println("Message arrived [" + String(topic) + "] ");
+    Trace::log(TraceLevel::DEBUG, "Message arrived [" + String(topic) + "]");
 
     for (unsigned int i = 0; i < length; i++)
     {
@@ -49,8 +50,7 @@ void MqttPublisher::mqttCallback(char *topic, byte *payload, unsigned int length
         int newValue = message.toInt();
         if (newValue > 0)
         {
-            Serial.print("Updating updateSensorDataInterval to ");
-            Serial.println(newValue);
+            Trace::logf(TraceLevel::INFO, "Updating updateSensorDataInterval to %d", newValue);
 
            // Call callback function with the new value
             instance->updateSensorDataInterval(newValue);
@@ -91,20 +91,18 @@ void MqttPublisher::reconnectMqtt()
     // Loop until we're reconnected
     while (!mqttClient.connected())
     {
-        Serial.print("Attempting MQTT connection...");
+        Trace::log(TraceLevel::INFO, "Attempting MQTT connection...");
         // Attempt to connect
         if (mqttClient.connect(deviceName.c_str(), mqtt_user, mqtt_password))
         {
-            Serial.println("connected");
+            Trace::log(TraceLevel::INFO, "MQTT connected");
 
             // Subscribe to messages
             mqttClient.subscribe((instance->deviceName + "/updateSensorDataInterval").c_str());
         }
         else
         {
-            Serial.print("failed, rc=");
-            Serial.print(mqttClient.state());
-            Serial.println(" try again in 5 seconds");
+            Trace::logf(TraceLevel::WARNING, "MQTT connection failed, rc=%d, retrying in 5 seconds", mqttClient.state());
             // Wait 5 seconds before retrying
             delay(5000);
         }
@@ -137,7 +135,7 @@ void MqttPublisher::publishInternal(TopicValuePair *topics, size_t count)
         const auto &topicValuePair = topics[i];
         if (mqttClient.publish(topicValuePair.topic.c_str(), topicValuePair.value.c_str()) == false)
         {
-            Serial.println(topicValuePair.topic + " not published");
+            Trace::log(TraceLevel::WARNING, topicValuePair.topic + " not published");
         }
     }
 }

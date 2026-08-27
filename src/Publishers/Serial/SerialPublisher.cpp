@@ -1,6 +1,7 @@
 // SerialPublisher.cpp
 
 #include "SerialPublisher.h"
+#include "trace.h"
 #include <Arduino.h>
 
 SerialPublisher *SerialPublisher::instance = nullptr;
@@ -17,7 +18,7 @@ void SerialPublisher::setup()
     {
         delay(10);
     }
-    Serial.println("Welcome to AZ-ONEBoard!");
+    Trace::log(TraceLevel::INFO, "Welcome to AZ-ONEBoard!");
 }
 
 void SerialPublisher::publish(const SensorData &sensorData)
