@@ -36,4 +36,16 @@ constexpr int EEPROM_SIZE = 512;
 constexpr long EEPROM_SENSOR_INTERVAL_MIN_MS = 0;
 constexpr long EEPROM_SENSOR_INTERVAL_MAX_MS = 1000000;
 
+// Sensor update timing (persisted default; actual value may be overridden
+// at runtime via EEPROM/MQTT, see SystemConfig).
+constexpr unsigned long SENSOR_UPDATE_INTERVAL_DEFAULT_MS = 5000;
+
+// Common data (IP address, current sensor interval) publish timing.
+constexpr unsigned long COMMON_DATA_INTERVAL_MS = 60000UL * 5UL;
+
+// How long Application waits for the initial WiFi connection during
+// startup before proceeding non-blocking. WifiManager keeps retrying in
+// the background regardless of this timeout.
+constexpr uint32_t WIFI_INITIAL_CONNECT_TIMEOUT_MS = 15000;
+
 #endif // CONFIG_H
