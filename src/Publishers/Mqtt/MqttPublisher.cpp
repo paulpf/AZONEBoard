@@ -8,13 +8,8 @@
 #include "../../_interfaces/delegates.h"
 #include "trace.h"
 
-#ifdef USE_PRIVATE_SECRET
-#include "../../_secrets/MqttSecret.h"
-#include "../../_configs/MqttConfig.h"
-#else
 #include "MqttSecret.h"
 #include "MqttConfig.h"
-#endif
 
 MqttPublisher *MqttPublisher::instance = nullptr;
 

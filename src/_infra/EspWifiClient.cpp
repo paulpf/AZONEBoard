@@ -1,8 +1,4 @@
-#ifdef USE_PRIVATE_SECRET
-#include "../../_secrets/WifiSecret.h"
-#else
-#include "./_secrets/WifiSecret.h"
-#endif
+#include "WifiSecret.h"
 
 #include "EspWifiClient.h"
 #include <Arduino.h>

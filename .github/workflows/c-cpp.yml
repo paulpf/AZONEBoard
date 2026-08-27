@@ -1,4 +1,4 @@
-name: Build ESP12E-USB
+name: Build ESP12E
 
 on:
   push:
@@ -26,8 +26,11 @@ jobs:
         python -m pip install --upgrade pip
         pip install platformio
 
+    - name: Create stub secrets
+      run: bash scripts/setup_secrets.sh
+
     - name: Build environment esp12e-usb
       run: platformio run -e esp12e-usb
 
-    - name: Build environment esp12e-usb
+    - name: Build environment esp12e-ota
       run: platformio run -e esp12e-ota
