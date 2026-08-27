@@ -13,7 +13,7 @@ SerialPublisher::SerialPublisher()
 
 void SerialPublisher::setup()
 {
-    Serial.begin(115200);
+    Serial.begin(SERIAL_BAUD_RATE);
     while (!Serial)
     {
         delay(10);

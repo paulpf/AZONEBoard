@@ -55,6 +55,15 @@ void MqttPublisher::mqttCallback(char *topic, byte *payload, unsigned int length
 
 void MqttPublisher::publish(const SensorData &sensorData)
 {
+    // Bail out while WiFi itself is down instead of falling into
+    // reconnectMqtt()'s blocking retry loop, which can only ever succeed
+    // once the network link is back - WifiManager already owns retrying
+    // that in the background.
+    if (WiFi.status() != WL_CONNECTED)
+    {
+        return;
+    }
+
     // Connect to the mqtt broker
     if (!mqttClient.connected())
     {
@@ -106,6 +115,12 @@ void MqttPublisher::reconnectMqtt()
 
 void MqttPublisher::publishCommonData(const CommonData &commonData)
 {
+    // Same WiFi-down guard as publish() - see comment there.
+    if (WiFi.status() != WL_CONNECTED)
+    {
+        return;
+    }
+
     // Connect to the mqtt broker
     if (!mqttClient.connected())
     {

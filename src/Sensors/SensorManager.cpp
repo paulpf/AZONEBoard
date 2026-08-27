@@ -49,17 +49,8 @@ void SensorManager::unsubscribeFromSensorDataEvent(IPublisher *publisher)
         publishers.end());
 }
 
-// Read temperature from SHT30 sensor
-float SensorManager::readTemperature()
-{
-    // Get data from SHT30 sensor
-    if(readSht30())
-    {
-        return sht30.cTemp;
-    }
-    return 0;
-}
-
+// Trigger one SHT30 measurement; on success, sht30.cTemp/sht30.humidity
+// hold both the temperature and humidity readings from that same reading.
 bool SensorManager::readSht30()
 {
     if (sht30.get() != 0)
@@ -71,27 +62,8 @@ bool SensorManager::readSht30()
     return true;
 }
 
-// Read humidity from SHT30 sensor
-float SensorManager::readHumidity()
-{
-    // Get data from SHT30 sensor
-    if(readSht30())
-    {
-        return sht30.humidity;
-    }
-    return 0;
-}
-
-// Read TVOC from SGP30 sensor
-uint16_t SensorManager::readTVOC()
-{
-   if(readSgp30())
-   {
-       return sgp30.TVOC;
-   }
-    return 0;
-}
-
+// Trigger one SGP30 IAQ measurement; on success, sgp30.TVOC/sgp30.eCO2
+// hold both readings from that same measurement.
 bool SensorManager::readSgp30()
 {
     if(!sgp30.IAQmeasure())
@@ -103,32 +75,14 @@ bool SensorManager::readSgp30()
     return true;
 }
 
-// Read CO2 from SGP30 sensor
-uint16_t SensorManager::readCO2()
-{
-    if(readSgp30())
-    {
-        return sgp30.eCO2;
-    }
-    return 0;
-}
-
 // Read light level from BH1750 sensor
 uint16_t SensorManager::readLightLevel()
 {
     return lightMeter.readLightLevel();
 }
 
-// Read raw ethanal value from SGP30 sensor
-uint16_t SensorManager::readEthanol()
-{
-    if(readSgp30Raw())
-    {
-        return sgp30.rawEthanol;
-    }
-    return 0;
-}
-
+// Trigger one SGP30 raw measurement; on success, sgp30.rawH2/rawEthanol
+// hold both readings from that same measurement.
 bool SensorManager::readSgp30Raw()
 {
     if(!sgp30.IAQmeasureRaw())
@@ -140,16 +94,6 @@ bool SensorManager::readSgp30Raw()
     return true;
 }
 
-// Read raw H2 value from SGP30 sensor
-uint16_t SensorManager::readH2()
-{
-    if(readSgp30Raw())
-    {
-        return sgp30.rawH2;
-    }
-    return 0;
-}
-
 // Get sensor data from all sensors
 void SensorManager::updateSensorData()
 {
@@ -158,12 +102,47 @@ void SensorManager::updateSensorData()
     // Clear errors
     errors.clear();
 
-    sensorData.temperature = readTemperature();
-    sensorData.humidity = readHumidity();
-    sensorData.tvoc = readTVOC();
-    sensorData.co2 = readCO2();
-    sensorData.rawEthanol = readEthanol();
-    sensorData.rawH2 = readH2();
+    // Each physical sensor is measured exactly once per cycle; both derived
+    // values per sensor (temperature+humidity, TVOC+CO2, H2+ethanol) are
+    // read from the single resulting measurement instead of triggering it
+    // twice.
+    // SensorData's temperature/humidity/tvoc/co2 fields have no default
+    // member initializer, so the failure branches below explicitly zero
+    // them - matching the original readTemperature()/readHumidity()/etc.
+    // wrappers, which returned 0 on failure.
+    if (readSht30())
+    {
+        sensorData.temperature = sht30.cTemp;
+        sensorData.humidity = sht30.humidity;
+    }
+    else
+    {
+        sensorData.temperature = 0;
+        sensorData.humidity = 0;
+    }
+
+    if (readSgp30())
+    {
+        sensorData.tvoc = sgp30.TVOC;
+        sensorData.co2 = sgp30.eCO2;
+    }
+    else
+    {
+        sensorData.tvoc = 0;
+        sensorData.co2 = 0;
+    }
+
+    if (readSgp30Raw())
+    {
+        sensorData.rawH2 = sgp30.rawH2;
+        sensorData.rawEthanol = sgp30.rawEthanol;
+    }
+    else
+    {
+        sensorData.rawH2 = 0;
+        sensorData.rawEthanol = 0;
+    }
+
     sensorData.lightLevel = readLightLevel();
 
     // Accumulate errors to one string
