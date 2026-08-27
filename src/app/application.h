@@ -3,7 +3,9 @@
 
 #include "wifimanager.h"
 #include "otamanager.h"
+#include "mqttmanager.h"
 #include "systemconfig.h"
+#include "connectivitycoordinator.h"
 #include "../_infra/EepromManager.h"
 #include "../Sensors/SensorManager.h"
 #include "../Publishers/Serial/SerialPublisher.h"
@@ -19,7 +21,9 @@ public:
   Application(WifiManager &wifiManager, OtaManager &otaManager,
               EepromManager &eepromManager, SensorManager &sensorManager,
               SerialPublisher &serialPublisher, MqttPublisher &mqttPublisher,
-              WebserverPublisher &webserverPublisher, SystemConfig &systemConfig);
+              MqttManager &mqttManager, WebserverPublisher &webserverPublisher,
+              ConnectivityCoordinator &connectivityCoordinator,
+              SystemConfig &systemConfig);
 
   void setup();
   void loop();
@@ -33,15 +37,8 @@ private:
 
   void handleStartup();
   void publishCommonData();
-  void onSensorUpdateIntervalChanged(int newValue);
-
-  // MqttPublisher::registerCallback() only accepts a plain function
-  // pointer (see _interfaces/delegates.h), so a static trampoline bridges
-  // back to the single Application instance - the same pattern already
-  // used by MqttPublisher/SerialPublisher/WebserverPublisher for their
-  // own static callbacks.
-  static void sensorUpdateIntervalTrampoline(int newValue);
-  static Application *_instance;
+  void publishHealth();
+  void handleMqttMessage(char *topic, uint8_t *payload, unsigned int length);
 
   WifiManager &_wifiManager;
   OtaManager &_otaManager;
@@ -49,15 +46,25 @@ private:
   SensorManager &_sensorManager;
   SerialPublisher &_serialPublisher;
   MqttPublisher &_mqttPublisher;
+  MqttManager &_mqttManager;
   WebserverPublisher &_webserverPublisher;
+  ConnectivityCoordinator &_connectivityCoordinator;
   SystemConfig &_systemConfig;
+
+  // Persistent storage for the "config/.../set" topic string passed to
+  // MqttManager::subscribe(): that call only stores the raw char* pointer,
+  // so the underlying String must outlive it (deviceName is a runtime MAC-
+  // based value, not a compile-time literal - see config.h).
+  String _sensorIntervalSetTopic;
 
   unsigned long _lastSensorUpdateTime = 0;
   unsigned long _lastCommonDataUpdateTime = 0;
+  unsigned long _lastRssiPublishTime = 0;
   unsigned long _startupWaitStart = 0;
   StartupState _startupState = StartupState::WAITING_FOR_WIFI;
   bool _otaInitialized = false;
   bool _initialCommonDataPublished = false;
+  bool _sensorReady = false;
 };
 
 #endif // APPLICATION_H

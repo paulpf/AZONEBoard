@@ -2,15 +2,16 @@
 
 1. [Introduction](#introduction)
 2. [Architecture](#architecture)
-3. [Getting Started](#getting-started)
-4. [Build and Upload](#build-and-upload)
-5. [Logging](#logging)
-6. [Tests and CI](#tests-and-ci)
-7. [Publishers](#publishers)
+3. [Sensor calibration](#sensor-calibration)
+4. [Getting Started](#getting-started)
+5. [Build and Upload](#build-and-upload)
+6. [Logging](#logging)
+7. [Tests and CI](#tests-and-ci)
+8. [Publishers](#publishers)
     - [SerialPublisher](#serialpublisher)
     - [WebserverPublisher](#webserverpublisher)
     - [MqttPublisher](#mqttpublisher)
-8. [3D-printed Case for the AZ-ONEBoard](#3d-printed-case-for-the-az-oneboard)
+9. [3D-printed Case for the AZ-ONEBoard](#3d-printed-case-for-the-az-oneboard)
 
 ---
 
@@ -51,9 +52,57 @@ src/
 `WifiManager` connects non-blockingly and reconnects with exponential
 backoff + jitter on connection loss; `OtaManager` is fail-closed by default
 (OTA stays disabled until a password is configured, see below);
-`EepromManager` persists the sensor update interval, which can also be
-changed at runtime over MQTT. See `docs/TEMPLATE_MIGRATION_PLAN.md` for the
-background on why the project is structured this way.
+`EepromManager` persists the sensor update interval (changeable at runtime
+over MQTT) and the SGP30's eCO2/TVOC baseline (see
+[Sensor calibration](#sensor-calibration)). See
+`docs/TEMPLATE_MIGRATION_PLAN.md` for the background on why the project is
+structured this way.
+
+# Sensor calibration
+
+The board's "CO2 sensor" is an Adafruit SGP30, not a real NDIR CO2 sensor -
+it derives eCO2 (equivalent CO2) and TVOC purely from its own gas signal.
+There is no fresh-air/reference-gas calibration for this sensor type;
+instead, its on-chip algorithm builds up an internal baseline that needs
+roughly 12h of continuous operation to settle. Accuracy is ±15% for TVOC
+and ±15%/±50ppm (whichever is larger) for eCO2 - a medium-accuracy sensor
+by design, not a measurement flaw.
+
+## Fixed 1Hz measurement cadence
+
+Sensirion's datasheet requires `IAQmeasure()` to be called at a fixed 1Hz
+cadence for the on-chip dynamic baseline algorithm to work correctly - it's
+tuned specifically for that sampling rate. This is independent of, and
+usually much faster than, `sensorUpdateIntervalMs` (the configurable
+publish interval, default 5s). `SensorManager::loop()` - called every
+`Application::loop()` iteration, unconditionally - drives eCO2/TVOC
+measurement on its own `SGP30_MEASURE_INTERVAL_MS` (1s) timer;
+`updateSensorData()` just reads the most recently cached result when it
+publishes.
+
+## Baseline persistence
+
+`SensorManager` persists the SGP30's internal baseline via `EepromManager`
+so it survives reboots instead of re-learning from scratch every time:
+
+- On startup, a previously saved baseline (if any) is restored via
+  `Adafruit_SGP30::setIAQBaseline()`.
+- After the 12h burn-in window (`SGP30_BASELINE_BURN_IN_MS` in
+  `src/config/config.h`), the current baseline is read via
+  `getIAQBaseline()` and saved once an hour
+  (`SGP30_BASELINE_SAVE_INTERVAL_MS`).
+
+## Humidity compensation
+
+The SGP30 has on-chip humidity compensation for eCO2/TVOC, but needs an
+external absolute-humidity value to use it. Since the SHT30 (temperature +
+relative humidity) is already on the board, `SensorManager` computes
+absolute humidity from its last reading (Sensirion's SGP30 driver
+integration formula) and feeds it to `Adafruit_SGP30::setHumidity()` before
+every measurement.
+
+All of this runs automatically as part of the regular sensor loop/update
+cycle - no user action required.
 
 # Getting Started
 
@@ -83,14 +132,14 @@ This creates (only if missing - existing files are never overwritten):
 
 ```text
 ../_secrets/
-├── WifiSecret.h     # const char *ssid / *password
-├── MqttSecret.h     # const char *mqtt_user / *mqtt_password
-└── OtaSecret.h      # const char *ota_password (empty = OTA disabled)
+├── WifiSecret.h     # #define WIFI_SSID / WIFI_PWD
+├── MqttSecret.h     # #define MQTT_USER / MQTT_PWD
+└── OtaSecret.h      # #define OTA_PASSWORD (empty = OTA disabled)
 ../_config/
-└── MqttConfig.h     # const char *mqtt_server / const int mqtt_port
+└── MqttConfig.h     # #define MQTT_SERVER_IP / MQTT_SERVER_PORT
 ```
 
-Fill in the `TODO` placeholders before building. Leaving `ota_password`
+Fill in the `TODO` placeholders before building. Leaving `OTA_PASSWORD`
 empty is intentional: `OtaManager` is fail-closed and keeps OTA disabled
 until a password is set (or `OTA_ALLOW_INSECURE_NO_PASSWORD` is explicitly
 enabled in `src/config/config.h` for isolated dev networks only).

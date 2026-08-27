@@ -1,24 +1,29 @@
 #include "application.h"
 #include "trace.h"
 #include "../_structures/CommonData.h"
+#include <ESP8266WiFi.h>
+#include <cstring>
+#include <cstdlib>
 
 // External secrets - located outside this project in ../_secrets/
 // Include path is set via build_flags in platformio.ini: -I ../_secrets
 #include "WifiSecret.h"
 #include "OtaSecret.h"
-
-Application *Application::_instance = nullptr;
+#include "MqttSecret.h"
+#include "MqttConfig.h"
 
 Application::Application(WifiManager &wifiManager, OtaManager &otaManager,
                          EepromManager &eepromManager, SensorManager &sensorManager,
                          SerialPublisher &serialPublisher, MqttPublisher &mqttPublisher,
-                         WebserverPublisher &webserverPublisher, SystemConfig &systemConfig)
+                         MqttManager &mqttManager, WebserverPublisher &webserverPublisher,
+                         ConnectivityCoordinator &connectivityCoordinator,
+                         SystemConfig &systemConfig)
     : _wifiManager(wifiManager), _otaManager(otaManager),
       _eepromManager(eepromManager), _sensorManager(sensorManager),
       _serialPublisher(serialPublisher), _mqttPublisher(mqttPublisher),
-      _webserverPublisher(webserverPublisher), _systemConfig(systemConfig)
+      _mqttManager(mqttManager), _webserverPublisher(webserverPublisher),
+      _connectivityCoordinator(connectivityCoordinator), _systemConfig(systemConfig)
 {
-  _instance = this;
 }
 
 void Application::setup()
@@ -35,19 +40,26 @@ void Application::setup()
 
   // WiFi connect is non-blocking from here on; WifiManager::loop() (called
   // every loop() iteration below) drives connection state and reconnects.
-  _wifiManager.setup(ssid, password, DEVICE_NAME_PREFIX);
+  _wifiManager.setup(WIFI_SSID, WIFI_PWD, DEVICE_NAME_PREFIX);
 
-  // The WiFiClient handle and device name are available synchronously
-  // right after setup(), independent of whether the connection has
-  // actually completed yet - PubSubClient/ESP8266WebServer only need the
-  // handle, they manage their own connection state.
-  WiFiClient *wifiClient = _wifiManager.getWifiClient();
+  // The device name is available synchronously right after setup(),
+  // independent of whether the connection has actually completed yet.
   String deviceName = _wifiManager.getDeviceName();
-  _mqttPublisher.setup(wifiClient, deviceName);
-  _mqttPublisher.registerCallback(&Application::sensorUpdateIntervalTrampoline);
+
+  _mqttManager.setup(MQTT_SERVER_IP, MQTT_SERVER_PORT, MQTT_USER, MQTT_PWD, deviceName);
+  _mqttManager.setCallback([this](char *topic, uint8_t *payload, unsigned int length) {
+    handleMqttMessage(topic, payload, length);
+  });
+  // MqttManager::subscribe() only stores the char* pointer, so the backing
+  // String must outlive it - see application.h.
+  _sensorIntervalSetTopic = deviceName + MQTT_TOPIC_SUFFIX_SENSOR_INTERVAL_SET;
+  _mqttManager.subscribe(_sensorIntervalSetTopic.c_str());
+
+  _mqttPublisher.setup(deviceName);
   _webserverPublisher.setup(deviceName);
 
-  if (!_sensorManager.setup())
+  _sensorReady = _sensorManager.setup();
+  if (!_sensorReady)
   {
     Trace::log(TraceLevel::ERROR,
                "Sensor initialization failed - continuing, sensor readings may be unreliable");
@@ -72,17 +84,23 @@ void Application::loop()
   handleStartup();
 
   // Service WiFi state machine/reconnect behavior and OTA session handling.
+  // WifiManager itself traces connect/disconnect transitions, so no
+  // separate logging is needed here.
   _wifiManager.loop();
   _otaManager.loop();
 
-  if (_wifiManager.consumeConnectedEvent())
-  {
-    Trace::log(TraceLevel::INFO, "WiFi connected event");
-  }
-  if (_wifiManager.consumeDisconnectedEvent())
-  {
-    Trace::log(TraceLevel::WARNING, "WiFi disconnected event");
-  }
+  // Drives the SGP30's required fixed 1Hz measurement cadence - must run
+  // every iteration, independent of the (much lower, configurable) sensor
+  // publish interval below.
+  _sensorManager.loop();
+
+  // The sole consumer of WiFi connected/disconnected events: translates
+  // them into MQTT connect-request/force-disconnect. Events are consumed
+  // (cleared) on read, so nothing else may also call
+  // consumeConnectedEvent()/consumeDisconnectedEvent() or they'd race for
+  // the same flag.
+  _connectivityCoordinator.handleEvents();
+  _mqttManager.loop();
 
   if (_wifiManager.isConnected())
   {
@@ -92,16 +110,14 @@ void Application::loop()
     if (!_otaInitialized)
     {
       String deviceName = _wifiManager.getDeviceName();
-      _otaManager.setup(deviceName.c_str(), ota_password);
+      _otaManager.setup(deviceName.c_str(), OTA_PASSWORD);
       _otaInitialized = true;
     }
 
     // Publish common data (IP address, current sensor interval) once as
-    // soon as we are connected, then periodically. Both branches are
-    // guarded by isConnected() so this never runs while WiFi is known to
-    // be down - MqttPublisher's own reconnect handling can block for a
-    // while if it is invoked without connectivity (see Phase 6 notes in
-    // docs/TEMPLATE_MIGRATION_PLAN.md).
+    // soon as we are connected, then periodically. MqttPublisher's
+    // underlying MqttManager silently skips publishing while MQTT itself
+    // isn't connected yet, so this only needs to be gated on WiFi.
     if (!_initialCommonDataPublished)
     {
       publishCommonData();
@@ -115,12 +131,20 @@ void Application::loop()
     }
   }
 
+  if (_mqttManager.isConnected() &&
+      currentTime - _lastRssiPublishTime >= MQTT_RSSI_INTERVAL_MS)
+  {
+    _lastRssiPublishTime = currentTime;
+    _mqttPublisher.publishRssi(WiFi.RSSI());
+  }
+
   // Update sensor data if the interval has passed. Runs regardless of
   // WiFi state: SerialPublisher and WebserverPublisher don't need it.
   if (currentTime - _lastSensorUpdateTime >= _systemConfig.sensorUpdateIntervalMs)
   {
     _lastSensorUpdateTime = currentTime;
     _sensorManager.updateSensorData();
+    publishHealth();
   }
 
   _webserverPublisher.handle();
@@ -136,6 +160,7 @@ void Application::handleStartup()
 
   if (_wifiManager.isConnected())
   {
+    _connectivityCoordinator.ensureMqttConnected();
     _startupState = StartupState::RUNNING;
     return;
   }
@@ -159,16 +184,40 @@ void Application::publishCommonData()
   _mqttPublisher.publishCommonData(commonData);
 }
 
-void Application::onSensorUpdateIntervalChanged(int newValue)
+void Application::publishHealth()
 {
-  _systemConfig.sensorUpdateIntervalMs = newValue;
-  _eepromManager.writeUpdateSensorDataInterval(newValue);
+  char payload[160];
+  snprintf(payload, sizeof(payload),
+           "{\"sensorReady\":%s,\"wifiRssi\":%d,\"uptimeMs\":%lu,\"freeHeap\":%u,"
+           "\"otaEnabled\":%s,\"otaUpdating\":%s}",
+           _sensorReady ? "true" : "false",
+           WiFi.RSSI(),
+           millis(),
+           ESP.getFreeHeap(),
+           _otaManager.isEnabled() ? "true" : "false",
+           _otaManager.isUpdating() ? "true" : "false");
+  _mqttPublisher.publishHealth(payload);
 }
 
-void Application::sensorUpdateIntervalTrampoline(int newValue)
+void Application::handleMqttMessage(char *topic, uint8_t *payload, unsigned int length)
 {
-  if (_instance != nullptr)
+  if (strcmp(topic, _sensorIntervalSetTopic.c_str()) == 0)
   {
-    _instance->onSensorUpdateIntervalChanged(newValue);
+    char buf[16];
+    unsigned int len = length < sizeof(buf) - 1 ? length : sizeof(buf) - 1;
+    memcpy(buf, payload, len);
+    buf[len] = '\0';
+
+    unsigned long newValue = strtoul(buf, nullptr, 10);
+    if (newValue > 0)
+    {
+      Trace::logf(TraceLevel::INFO, "Updating sensorUpdateIntervalMs to %lu", newValue);
+      _systemConfig.sensorUpdateIntervalMs = newValue;
+      _eepromManager.writeUpdateSensorDataInterval(newValue);
+
+      CommonData commonData;
+      commonData.updateSensorDataInterval = _systemConfig.sensorUpdateIntervalMs;
+      _mqttPublisher.publishCommonData(commonData);
+    }
   }
 }

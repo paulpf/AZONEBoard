@@ -53,8 +53,8 @@ $wifiLines = @(
     '#define WIFI_SECRET_H',
     '',
     '// TODO: Replace with your WiFi credentials',
-    'const char *ssid = "Your_WiFi_SSID";',
-    'const char *password = "Your_WiFi_Password";',
+    '#define WIFI_SSID "Your_WiFi_SSID"',
+    '#define WIFI_PWD  "Your_WiFi_Password"',
     '',
     '#endif // WIFI_SECRET_H'
 )
@@ -65,8 +65,8 @@ $mqttSecretLines = @(
     '',
     '// TODO: Replace with your MQTT broker credentials',
     '// Leave empty strings if the broker requires no authentication.',
-    'const char *mqtt_user = "";',
-    'const char *mqtt_password = "";',
+    '#define MQTT_USER "your_mqtt_username"',
+    '#define MQTT_PWD  "your_mqtt_password"',
     '',
     '#endif // MQTT_SECRET_H'
 )
@@ -77,7 +77,7 @@ $otaLines = @(
     '',
     '// TODO: Set a strong password for OTA updates.',
     '// Leave empty to keep OTA disabled (fail-closed default, see OtaManager).',
-    'const char *ota_password = "";',
+    '#define OTA_PASSWORD ""',
     '',
     '#endif // OTA_SECRET_H'
 )
@@ -87,8 +87,8 @@ $mqttConfigLines = @(
     '#define MQTT_CONFIG_H',
     '',
     '// TODO: Replace with the IP address / hostname of your MQTT broker',
-    'const char *mqtt_server = "192.168.x.x";',
-    'const int mqtt_port = 1884;',
+    '#define MQTT_SERVER_IP   "192.168.x.x"',
+    '#define MQTT_SERVER_PORT 1883',
     '',
     '#endif // MQTT_CONFIG_H'
 )

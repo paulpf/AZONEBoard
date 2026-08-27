@@ -4,6 +4,8 @@
 #include "application.h"
 #include "wifimanager.h"
 #include "otamanager.h"
+#include "mqttmanager.h"
+#include "connectivitycoordinator.h"
 #include "systemconfig.h"
 #include "../_infra/EepromManager.h"
 #include "../Sensors/SensorManager.h"
@@ -26,8 +28,13 @@ private:
   EepromManager _eepromManager;
   SensorManager _sensorManager;
   SerialPublisher _serialPublisher;
+  // _mqttManager must be declared before _mqttPublisher/_connectivityCoordinator:
+  // both take it by reference in their constructor and C++ initializes
+  // members in declaration order regardless of the initializer list order.
+  MqttManager _mqttManager;
   MqttPublisher _mqttPublisher;
   WebserverPublisher _webserverPublisher;
+  ConnectivityCoordinator _connectivityCoordinator;
   SystemConfig _systemConfig;
   Application _app;
 };

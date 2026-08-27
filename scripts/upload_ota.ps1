@@ -59,11 +59,11 @@ if ([string]::IsNullOrWhiteSpace($IpAddress)) {
     exit 1
 }
 
-# Read OTA password from external secret header (const char *ota_password = "...";)
+# Read OTA password from external secret header (#define OTA_PASSWORD "...")
 $otaPassword = ""
 if (Test-Path $otaSecretFile) {
     $otaSecretContent = Get-Content $otaSecretFile -Raw -ErrorAction SilentlyContinue
-    if ($otaSecretContent -match 'ota_password\s*=\s*"([^"]*)"') {
+    if ($otaSecretContent -match '#define\s+OTA_PASSWORD\s+"([^"]*)"') {
         $otaPassword = $matches[1]
     }
 }
