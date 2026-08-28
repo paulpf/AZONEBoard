@@ -1,148 +1,55 @@
 // MqttPublisher.cpp
 
 #include "MqttPublisher.h"
-#include <Arduino.h>
 #include <ESP8266WiFi.h>
-#include "../../_structures/TopicValuePair.h"
-#include "../../_structures/CommonData.h"
-#include "../../_interfaces/delegates.h"
+#include "config.h"
 
-#ifdef USE_PRIVATE_SECRET
-#include "../../_secrets/MqttSecret.h"
-#include "../../_configs/MqttConfig.h"
-#else
-#include "MqttSecret.h"
-#include "MqttConfig.h"
-#endif
-
-MqttPublisher *MqttPublisher::instance = nullptr;
-
-MqttPublisher::MqttPublisher()
+MqttPublisher::MqttPublisher(IMessagePublisher &messagePublisher)
+    : _messagePublisher(messagePublisher)
 {
-    instance = this;
 }
 
-void MqttPublisher::setup(WiFiClient *wifiClient, String deviceName)
+void MqttPublisher::setup(const String &deviceName)
 {
-    instance->deviceName = deviceName;
-    instance->ipAddress = WiFi.localIP();
-    mqttClient.setClient(*wifiClient);
-    mqttClient.setServer(mqtt_server, mqtt_port);
-    mqttClient.setCallback(mqttCallback);
-}
-
-// Callback function to handle incoming mqtt messages
-void MqttPublisher::mqttCallback(char *topic, byte *payload, unsigned int length)
-{
-    String message;
-
-    Serial.println("Message arrived [" + String(topic) + "] ");
-
-    for (unsigned int i = 0; i < length; i++)
-    {
-        message += (char)payload[i];
-    }
-
-    if (String(topic) == (instance->deviceName + "/updateSensorDataInterval"))
-    {
-        // Update updateSensorDataInterval
-        int newValue = message.toInt();
-        if (newValue > 0)
-        {
-            Serial.print("Updating updateSensorDataInterval to ");
-            Serial.println(newValue);
-
-           // Call callback function with the new value
-            instance->updateSensorDataInterval(newValue);
-        }
-    }
+    _deviceName = deviceName;
 }
 
 void MqttPublisher::publish(const SensorData &sensorData)
 {
-    // Connect to the mqtt broker
-    if (!mqttClient.connected())
-    {
-        instance->reconnectMqtt();
-    }
-    mqttClient.loop();
-
-    TopicValuePair topics[] = 
-    {
-        {instance->deviceName + "/temperature", String(sensorData.temperature)},
-        {instance->deviceName + "/humidity", String(sensorData.humidity)},
-        {instance->deviceName + "/tvoc", String(sensorData.tvoc)},
-        {instance->deviceName + "/co2", String(sensorData.co2)},
-        {instance->deviceName + "/rawEthanol", String(sensorData.rawEthanol)},
-        {instance->deviceName + "/rawH2", String(sensorData.rawH2)},
-        {instance->deviceName + "/lightLevel", String(sensorData.lightLevel)},
-        {instance->deviceName + "/errors", sensorData.errors}
-    };
-
-    // Get count of topics
-    size_t count = sizeof(topics) / sizeof(topics[0]);
-
-    publishInternal(topics, count);
-}
-
-// Method to reconnect to the mqtt broker
-void MqttPublisher::reconnectMqtt()
-{
-    // Loop until we're reconnected
-    while (!mqttClient.connected())
-    {
-        Serial.print("Attempting MQTT connection...");
-        // Attempt to connect
-        if (mqttClient.connect(deviceName.c_str(), mqtt_user, mqtt_password))
-        {
-            Serial.println("connected");
-
-            // Subscribe to messages
-            mqttClient.subscribe((instance->deviceName + "/updateSensorDataInterval").c_str());
-        }
-        else
-        {
-            Serial.print("failed, rc=");
-            Serial.print(mqttClient.state());
-            Serial.println(" try again in 5 seconds");
-            // Wait 5 seconds before retrying
-            delay(5000);
-        }
-    }
+    _messagePublisher.publishRetained((_deviceName + MQTT_TOPIC_SUFFIX_TEMPERATURE).c_str(),
+                                       String(sensorData.temperature).c_str());
+    _messagePublisher.publishRetained((_deviceName + MQTT_TOPIC_SUFFIX_HUMIDITY).c_str(),
+                                       String(sensorData.humidity).c_str());
+    _messagePublisher.publishRetained((_deviceName + MQTT_TOPIC_SUFFIX_TVOC).c_str(),
+                                       String(sensorData.tvoc).c_str());
+    _messagePublisher.publishRetained((_deviceName + MQTT_TOPIC_SUFFIX_CO2).c_str(),
+                                       String(sensorData.co2).c_str());
+    _messagePublisher.publishRetained((_deviceName + MQTT_TOPIC_SUFFIX_RAW_ETHANOL).c_str(),
+                                       String(sensorData.rawEthanol).c_str());
+    _messagePublisher.publishRetained((_deviceName + MQTT_TOPIC_SUFFIX_RAW_H2).c_str(),
+                                       String(sensorData.rawH2).c_str());
+    _messagePublisher.publishRetained((_deviceName + MQTT_TOPIC_SUFFIX_LIGHT_LEVEL).c_str(),
+                                       String(sensorData.lightLevel).c_str());
+    _messagePublisher.publishRetained((_deviceName + MQTT_TOPIC_SUFFIX_ERRORS).c_str(),
+                                       sensorData.errors.c_str());
 }
 
 void MqttPublisher::publishCommonData(const CommonData &commonData)
 {
-    // Connect to the mqtt broker
-    if (!mqttClient.connected())
-    {
-        instance->reconnectMqtt();
-    }
-    mqttClient.loop();
-
-    TopicValuePair topics[] = 
-    {
-        {instance->deviceName + "/ipAddress", instance->ipAddress.toString()},
-        {instance->deviceName + "/updateSensorDataInterval", String(commonData.updateSensorDataInterval)}
-    };
-
-    instance->publishInternal(topics, 2);
+    _messagePublisher.publishRetained((_deviceName + MQTT_TOPIC_SUFFIX_IP).c_str(),
+                                       WiFi.localIP().toString().c_str());
+    _messagePublisher.publishRetained((_deviceName + MQTT_TOPIC_SUFFIX_SENSOR_INTERVAL_MS).c_str(),
+                                       String(commonData.updateSensorDataInterval).c_str());
 }
 
-void MqttPublisher::publishInternal(TopicValuePair *topics, size_t count)
+void MqttPublisher::publishRssi(int rssi)
 {
-    // Iterate over the array and publish each topic
-    for (size_t i = 0; i < count; ++i)
-    {
-        const auto &topicValuePair = topics[i];
-        if (mqttClient.publish(topicValuePair.topic.c_str(), topicValuePair.value.c_str()) == false)
-        {
-            Serial.println(topicValuePair.topic + " not published");
-        }
-    }
+    // Live signal-strength metric, not a lasting state - not retained,
+    // matches how RSSI is published in the water-tank-monitor template.
+    _messagePublisher.publish((_deviceName + MQTT_TOPIC_SUFFIX_RSSI).c_str(), String(rssi).c_str());
 }
 
-void MqttPublisher::registerCallback(void (*updateSensorDataInterval)(int))
+void MqttPublisher::publishHealth(const char *healthJson)
 {
-    instance->updateSensorDataInterval = updateSensorDataInterval;
+    _messagePublisher.publishRetained((_deviceName + MQTT_TOPIC_SUFFIX_HEALTH).c_str(), healthJson);
 }

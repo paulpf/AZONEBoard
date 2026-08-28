@@ -1,12 +1,17 @@
 ## Table of Contents
 
 1. [Introduction](#introduction)
-2. [Getting Started](#getting-started)
-3. [Publishers](#publishers)
+2. [Architecture](#architecture)
+3. [Sensor calibration](#sensor-calibration)
+4. [Getting Started](#getting-started)
+5. [Build and Upload](#build-and-upload)
+6. [Logging](#logging)
+7. [Tests and CI](#tests-and-ci)
+8. [Publishers](#publishers)
     - [SerialPublisher](#serialpublisher)
     - [WebserverPublisher](#webserverpublisher)
     - [MqttPublisher](#mqttpublisher)
-4. [3D-printed Case for the AZ-ONEBoard](#3d-printed-case-for-the-az-oneboard)
+9. [3D-printed Case for the AZ-ONEBoard](#3d-printed-case-for-the-az-oneboard)
 
 ---
 
@@ -20,96 +25,189 @@ AZONEBoard is a private project for the AZ-ONEBoard from AZ-Delivery. This board
 
 Link: [AZ-ONEBoard Product Page](https://www.az-delivery.de/products/az-oneboard-modulares-entwicklungsboard-inklusive-extensionboards-sht30-luftfeuchtigkeit-temperatur-bh1750-umgebungslicht-ccs811-umgebungsgase?variant=44593641881867)
 
+This project is implemented using the **Object-Oriented Programming (OOP)** paradigm. The project defines several classes, such as `MqttPublisher`, `WebserverPublisher`, and `SerialPublisher`, each encapsulating specific functionality related to publishing sensor data, plus infrastructure classes (`WifiManager`, `OtaManager`, `EepromManager`, `Trace`) that handle connectivity, over-the-air updates, persistence and logging. `Bootstrap` (the composition root) wires all of these together and hands a ready-to-run `Application` to `main.cpp`.
 
-This project is implemented using the **Object-Oriented Programming (OOP)** paradigm. OOP is a programming paradigm based on the concept of "objects", which can contain data in the form of fields (often known as attributes or properties), and code in the form of procedures (often known as methods).
+# Architecture
 
-1. **Classes and Objects**: The project defines several classes, such as `MqttPublisher`, `WebserverPublisher`, and `SerialPublisher`, each encapsulating specific functionalities related to publishing sensor data. Instances of these classes (objects) are created to perform the actual data publishing tasks.
+The `src/` layout follows a layered structure:
 
-2. **Encapsulation**: Each class encapsulates its data and methods, providing a clear interface for interaction. For example, the `MqttPublisher` class encapsulates the MQTT client setup, connection handling, and data publishing methods.
+```text
+src/
+├── app/            Bootstrap (composition root), Application (startup/loop
+│                   orchestration), main.cpp
+├── config/         config.h (compile-time constants), systemconfig.h
+│                   (injectable runtime config), global_defines.h
+├── contracts/      narrow interfaces (IWifiConnectivity, IOtaLoopControl)
+├── domain/         pure, hardware-free logic (ReconnectPolicy,
+│                   IntervalPolicy) - unit-tested natively, see Tests and CI
+├── infrastructure/ WifiManager, OtaManager, Trace (logging)
+├── _infra/         EepromManager (persisted settings)
+├── _interfaces/    IPublisher, delegates
+├── _structures/    SensorData, CommonData, TopicValuePair
+├── Sensors/        SensorManager (SHT30/SGP30/BH1750)
+└── Publishers/     SerialPublisher, MqttPublisher, WebserverPublisher
+    (each implements IPublisher)
+```
 
-3. **Inheritance**: Although not explicitly mentioned in the provided excerpt, OOP allows for the creation of new classes based on existing ones, promoting code reuse and the creation of more specific classes from general ones.
+`WifiManager` connects non-blockingly and reconnects with exponential
+backoff + jitter on connection loss; `OtaManager` is fail-closed by default
+(OTA stays disabled until a password is configured, see below);
+`EepromManager` persists the sensor update interval (changeable at runtime
+over MQTT) and the SGP30's eCO2/TVOC baseline (see
+[Sensor calibration](#sensor-calibration)). See
+`docs/TEMPLATE_MIGRATION_PLAN.md` for the background on why the project is
+structured this way.
 
-4. **Polymorphism**: This concept allows objects of different classes to be treated as objects of a common superclass. It is particularly useful for implementing interfaces and abstract classes, enabling different classes to be used interchangeably.
+# Sensor calibration
 
-5. **Abstraction**: The project abstracts the complexities of sensor data publishing by providing high-level classes that handle the details of MQTT, web server, and serial communication.
+The board's "CO2 sensor" is an Adafruit SGP30, not a real NDIR CO2 sensor -
+it derives eCO2 (equivalent CO2) and TVOC purely from its own gas signal.
+There is no fresh-air/reference-gas calibration for this sensor type;
+instead, its on-chip algorithm builds up an internal baseline that needs
+roughly 12h of continuous operation to settle. Accuracy is ±15% for TVOC
+and ±15%/±50ppm (whichever is larger) for eCO2 - a medium-accuracy sensor
+by design, not a measurement flaw.
 
-By using the OOP paradigm, the project achieves modularity, making it easier to manage, extend, and maintain. Each class is responsible for a specific aspect of the project, promoting a clean and organized codebase.
+## Fixed 1Hz measurement cadence
+
+Sensirion's datasheet requires `IAQmeasure()` to be called at a fixed 1Hz
+cadence for the on-chip dynamic baseline algorithm to work correctly - it's
+tuned specifically for that sampling rate. This is independent of, and
+usually much faster than, `sensorUpdateIntervalMs` (the configurable
+publish interval, default 5s). `SensorManager::loop()` - called every
+`Application::loop()` iteration, unconditionally - drives eCO2/TVOC
+measurement on its own `SGP30_MEASURE_INTERVAL_MS` (1s) timer;
+`updateSensorData()` just reads the most recently cached result when it
+publishes.
+
+## Baseline persistence
+
+`SensorManager` persists the SGP30's internal baseline via `EepromManager`
+so it survives reboots instead of re-learning from scratch every time:
+
+- On startup, a previously saved baseline (if any) is restored via
+  `Adafruit_SGP30::setIAQBaseline()`.
+- After the 12h burn-in window (`SGP30_BASELINE_BURN_IN_MS` in
+  `src/config/config.h`), the current baseline is read via
+  `getIAQBaseline()` and saved once an hour
+  (`SGP30_BASELINE_SAVE_INTERVAL_MS`).
+
+## Humidity compensation
+
+The SGP30 has on-chip humidity compensation for eCO2/TVOC, but needs an
+external absolute-humidity value to use it. Since the SHT30 (temperature +
+relative humidity) is already on the board, `SensorManager` computes
+absolute humidity from its last reading (Sensirion's SGP30 driver
+integration formula) and feeds it to `Adafruit_SGP30::setHumidity()` before
+every measurement.
+
+All of this runs automatically as part of the regular sensor loop/update
+cycle - no user action required.
 
 # Getting Started
-
-To get the project up and running, you first need to set up your development environment. Follow these steps:
 
 ## Prerequisites
 
 - [PlatformIO](https://platformio.org/)
 - [Visual Studio Code](https://code.visualstudio.com/)
 
-## Configuration of `platformio.ini`
+## Secrets and configuration
 
-The `platformio.ini` file is the main configuration file for PlatformIO projects. It defines the settings and parameters for building, uploading, and debugging your project. Below is a detailed explanation of the configuration options used in the provided `platformio.ini` file.
+WiFi/MQTT/OTA credentials and the MQTT broker address are never committed
+to this repository - they live one directory above the repo root and are
+pulled in via `-I` build flags in `platformio.ini`. Generate the stub
+files once:
 
-In this project, there exist four sections in the `platformio.ini` file:
-
-* **[env:esp12e-usb]**: This section configures the environment for the ESP12E board using USB for uploading firmware. It specifies the platform, board, framework, monitor speed, upload protocol, and the required libraries.
-
-* **[env:esp12e-ota]**: This section configures the environment for the ESP12E board using Over-The-Air (OTA) updates. It includes settings for the platform, board, framework, monitor speed, upload protocol, upload port (IP address for OTA), and the required libraries.
-
-* **[env:esp12e-usb-dev]**: This section is similar to the `esp12e-usb` section but is intended for development purposes. It includes an additional build flag (`-DUSE_PRIVATE_SECRET`) for development-specific configurations.
-
-* **[env:esp12e-ota-dev]**: This section is similar to the `esp12e-ota` section but is intended for development purposes. It also includes the additional build flag (`-DUSE_PRIVATE_SECRET`) and specifies the upload port for OTA updates.
-
-Each section allows for different configurations and settings, enabling you to easily switch between USB and OTA uploads, as well as between production and development environments. The sections with the ending `-dev` are intended for using secret information, which is not a part of this project. For example, you can use the `-dev` sections to test your project with your own WiFi and MQTT credentials, what will not be pushed to the repository. Here is a code snippet from the `MqttPublisher.cpp` file, where the secret information is included:
-
-```cpp
-#ifdef USE_PRIVATE_SECRET
-#include "../../_secrets/MqttSecret.h"
-#include "../../_configs/MqttConfig.h"
-#else
-#include "MqttSecret.h"
-#include "MqttConfig.h"
-#endif
+Windows (PowerShell):
+```powershell
+.\scripts\setup_secrets.ps1
 ```
 
-If you want to use the `-dev` sections, you have to create the `_secrets` and `_configs` folders in the directory two levels above the `src` folder. Inside the `_secrets` folder, you have to create the `MqttSecret.h` and `WifiSecret.h` files.
+Linux / macOS / CI:
+```bash
+bash scripts/setup_secrets.sh
+```
 
-Or you can use the `MqttSecret.h` and `WifiSecret.h` files in the `src` folder. In this case, you have to edit the `MqttSecret.h` and `WifiSecret.h` files to add your WiFi credentials. In this case you have to switch in platformio to the sections without `-dev` to load the project to the ESP.
+This creates (only if missing - existing files are never overwritten):
 
-## Building the Project
+```text
+../_secrets/
+├── WifiSecret.h     # #define WIFI_SSID / WIFI_PWD
+├── MqttSecret.h     # #define MQTT_USER / MQTT_PWD
+└── OtaSecret.h      # #define OTA_PASSWORD (empty = OTA disabled)
+../_config/
+└── MqttConfig.h     # #define MQTT_SERVER_IP / MQTT_SERVER_PORT
+```
 
-To build the project, follow these steps:
+Fill in the `TODO` placeholders before building. Leaving `OTA_PASSWORD`
+empty is intentional: `OtaManager` is fail-closed and keeps OTA disabled
+until a password is set (or `OTA_ALLOW_INSECURE_NO_PASSWORD` is explicitly
+enabled in `src/config/config.h` for isolated dev networks only).
 
-1. Open the project folder in Visual Studio Code.
-2. Open the PlatformIO sidebar.
-3. Click on the "Project Tasks" icon.
-4. Under "General," click on "Build" to compile the project.
+## Configuration of `platformio.ini`
 
-The project will be compiled, and any errors or warnings will be displayed in the terminal.
+Two environments exist:
 
-## Uploading the Firmware
+* **`[env:esp12e-usb]`** - build/upload over USB via `esptool`.
+* **`[env:esp12e-ota]`** - build/upload over the air via `espota`. There is
+  no fixed device IP in `platformio.ini`; pass it via CLI or use
+  `scripts/upload_ota.ps1` (see below).
 
-To upload the firmware to the ESP12E board, follow these steps:
+Both pull in `src/config`, `src/infrastructure`, `src/domain`,
+`src/contracts`, `../_secrets` and `../_config` as include paths. A third,
+host-only environment, `[env:native]`, builds and runs the unit tests in
+`test/native/` (see [Tests and CI](#tests-and-ci)).
 
-1. Connect the ESP12E board to your computer via USB.
-2. Open the project folder in Visual Studio Code.
-3. Open the PlatformIO sidebar.
-4. Click on the "Project Tasks" icon.
-5. Under "General," click on "Upload" to upload the firmware to the board.
+# Build and Upload
 
-The firmware will be uploaded to the ESP12E board, and you can monitor the progress in the terminal.
+## USB
 
-After the first upload, you can use the OTA upload. To do this, you have to change the section in the `platformio.ini` file from `esp12e-usb` to `esp12e-ota`. Then you can upload the firmware via OTA. The IP address of the ESP12E board is displayed in the serial monitor after the first upload.
+```bash
+pio run -e esp12e-usb
+pio run -e esp12e-usb -t upload -t monitor --upload-port COM3
+```
 
-## Running the Project
+## OTA
 
-After uploading the firmware, you can run the project by following these steps:
+After the first USB flash, the board's IP address is printed on the
+serial monitor (also visible in your router's DHCP client list, since
+`WifiManager` sets a `AZ-ONEBoard/<MAC>` hostname). Upload with:
 
-1. Open the serial monitor in Visual Studio Code.
-2. Click on the "Monitor" icon in the PlatformIO sidebar.
-3. The serial monitor will display the sensor data being published by the project.
+```powershell
+.\scripts\upload_ota.ps1
+```
 
-You can also access the web server to view the sensor data in a browser. Open a web browser and enter the IP address of the ESP12E board to access the web server.
+The script prompts for the IP address (remembering the last one used in
+`../_secrets/last_ota_ip.txt`) and reads the OTA password from
+`../_secrets/OtaSecret.h` automatically. Alternatively:
 
-Also yo ucan use the MQTT client to read the sensor data via MQTT. You can use, for example, ioBroker to read the sensor data.
+```bash
+pio run -e esp12e-ota --upload-port 192.168.x.x -t upload
+```
+
+# Logging
+
+All components log through `Trace` (see `src/infrastructure/trace.h`)
+instead of calling `Serial.print` directly:
+
+```cpp
+Trace::log(TraceLevel::INFO, "WiFi connected");
+Trace::logf(TraceLevel::WARNING, "RSSI: %d dBm", WiFi.RSSI());
+```
+
+The minimum level is controlled by `TRACE_LEVEL` in `src/config/config.h`.
+Note: `SerialPublisher::publish()` still writes sensor readings directly
+to `Serial` - that is its actual published payload, not a log message.
+
+# Tests and CI
+
+- Firmware build: `pio run -e esp12e-usb` / `pio run -e esp12e-ota`
+- Native unit tests (no hardware needed): `pio test -e native` - covers
+  `src/domain/reconnectpolicy.h` (WiFi reconnect backoff/jitter) and
+  `src/domain/intervalpolicy.h` (EEPROM interval bounds check)
+- CI workflow: `.github/workflows/c-cpp.yml`, split into a
+  `firmware-build` job (creates stub secrets, then builds both
+  environments) and a `native-tests` job.
 
 ## Publishers
 

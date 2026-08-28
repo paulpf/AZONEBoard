@@ -3,33 +3,31 @@
 #ifndef MQTT_PUBLISHER_H
 #define MQTT_PUBLISHER_H
 
+#include <Arduino.h>
 #include "./_structures/SensorData.h"
-#include "../../_interfaces/IPublisher.h"
-#include "../../_interfaces/delegates.h"
-#include <ESP8266WiFi.h>
-#include <PubSubClient.h>
 #include "./_structures/CommonData.h"
-#include "./_structures/TopicValuePair.h"
+#include "../../_interfaces/IPublisher.h"
+#include "imessagepublisher.h"
 
+// Translates AZONEBoard's structured sensor/common data into topic
+// publishes on the generic MqttManager (see infrastructure/mqttmanager.h).
+// Keeps IPublisher so SensorManager's subscriber fan-out (Serial/MQTT/
+// Webserver) stays unchanged; all connection/reconnect/LWT handling lives
+// in MqttManager - publishes are simply no-ops while disconnected (see
+// IMessagePublisher::publish/publishRetained), no guard needed here.
 class MqttPublisher : public IPublisher
 {
 public:
-    MqttPublisher();
-    void setup(WiFiClient *wifiClient, String deviceName);
-    void publish(const SensorData &data);
+    explicit MqttPublisher(IMessagePublisher &messagePublisher);
+    void setup(const String &deviceName);
+    void publish(const SensorData &data) override;
     void publishCommonData(const CommonData &commonData);
-    void registerCallback(void (*updateSensorDataInterval)(int));
+    void publishRssi(int rssi);
+    void publishHealth(const char *healthJson);
 
 private:
-    static MqttPublisher *instance; // Static pointer to the instance
-    PubSubClient mqttClient;
-    String deviceName;
-    IPAddress ipAddress;
-    static void mqttCallback(char *topic, byte *payload, unsigned int length);
-    void reconnectMqtt();
-    void publishInternal(TopicValuePair *topics, size_t count);
-    void (*callbackFunction)(int);
-    CallbackDelegate updateSensorDataInterval;
+    IMessagePublisher &_messagePublisher;
+    String _deviceName;
 };
 
 #endif // MQTT_PUBLISHER_H

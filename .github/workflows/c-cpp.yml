@@ -1,4 +1,4 @@
-name: Build ESP12E-USB
+name: CI
 
 on:
   push:
@@ -9,7 +9,8 @@ on:
       - main
 
 jobs:
-  build:
+  firmware-build:
+    name: Firmware Build (ESP12E)
     runs-on: ubuntu-latest
 
     steps:
@@ -26,8 +27,32 @@ jobs:
         python -m pip install --upgrade pip
         pip install platformio
 
+    - name: Create stub secrets
+      run: bash scripts/setup_secrets.sh
+
     - name: Build environment esp12e-usb
       run: platformio run -e esp12e-usb
 
-    - name: Build environment esp12e-usb
+    - name: Build environment esp12e-ota
       run: platformio run -e esp12e-ota
+
+  native-tests:
+    name: Native Unit Tests
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.8'
+
+    - name: Install PlatformIO
+      run: |
+        python -m pip install --upgrade pip
+        pip install platformio
+
+    - name: Run native tests
+      run: platformio test -e native
